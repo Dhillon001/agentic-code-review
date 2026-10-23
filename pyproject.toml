@@ -1,0 +1,31 @@
+[project]
+name = "agentic-code-review"
+version = "0.1.0"
+description = "Multi-agent PR reviewer: specialist reviewers + a verifier pass that kills false positives."
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40",
+    "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+acr = "reviewer.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reviewer"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["src", "."]
+testpaths = ["tests"]
