@@ -1,0 +1,9 @@
+diff --git a/app/math_utils.py b/app/math_utils.py
+--- a/app/math_utils.py
++++ b/app/math_utils.py
+@@ -1,4 +1,4 @@
+ def mean(values):
+-    if len(values) == 0:
++    if not values:
+         raise ValueError("mean() of empty sequence")
+     return sum(values) / len(values)

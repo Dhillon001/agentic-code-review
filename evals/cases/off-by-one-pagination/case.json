@@ -1,0 +1,10 @@
+{
+  "title": "Simplify pagination math",
+  "expected": [
+    {
+      "file": "app/pagination.py",
+      "line": 3,
+      "category": "correctness"
+    }
+  ]
+}

@@ -8,3 +8,9 @@ verifier pass that re-checks every finding before it's posted. Precision over vo
 ```bash
 pip install -e ".[dev]" && pytest -q
 ```
+
+```bash
+acr local --base main          # review your current branch
+acr pr owner/repo 123 --post   # review + post to a GitHub PR
+python evals/run_evals.py      # precision / recall on labelled cases
+```
