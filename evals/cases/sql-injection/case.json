@@ -1,0 +1,10 @@
+{
+  "title": "Use f-string for user lookup",
+  "expected": [
+    {
+      "file": "app/users.py",
+      "line": 6,
+      "category": "security"
+    }
+  ]
+}

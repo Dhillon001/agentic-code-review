@@ -1,0 +1,10 @@
+diff --git a/app/pagination.py b/app/pagination.py
+--- a/app/pagination.py
++++ b/app/pagination.py
+@@ -1,5 +1,5 @@
+ def paginate(items, page, per_page):
+     """Return the items for a 1-indexed page."""
+-    start = (page - 1) * per_page
++    start = page * per_page
+     end = start + per_page
+     return items[start:end]
