@@ -20,6 +20,10 @@ against the real code. Only what survives gets posted.
 [Evals](#evals) ·
 [Architecture](#layout)
 
+<br/>
+
+<img src="docs/overview.svg" alt="How Agentic Code Review works: a PR is read, noise files are skipped, context is gathered, four AI specialists review in parallel, a verifier double-checks every finding, and only verified comments are posted — 9 possible issues become 2 comments." width="100%"/>
+
 </div>
 
 ---

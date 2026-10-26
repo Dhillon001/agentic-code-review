@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Agentic Code Review: how a pull request becomes a few verified comments</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="1200" height="600" rx="24" fill="url(#bg)"/>
+
+  <!-- title -->
+  <text x="600" y="52" text-anchor="middle" font-size="30" font-weight="700" fill="#f8fafc">Agentic Code Review</text>
+  <text x="600" y="84" text-anchor="middle" font-size="16" fill="#cbd5e1">Four specialists look for bugs · a verifier double-checks each one · only real issues reach your PR</text>
+
+  <!-- ============ 1. Pull request ============ -->
+  <g>
+    <rect x="40" y="120" width="160" height="270" rx="14" fill="#1e293b" stroke="#334155"/>
+    <text x="60" y="150" font-size="14" font-weight="700" fill="#f1f5f9">PR #128</text>
+    <text x="180" y="150" text-anchor="end" font-size="12" fill="#94a3b8"><tspan fill="#4ade80">+42</tspan> <tspan fill="#f87171">−7</tspan></text>
+    <rect x="58" y="172" width="110" height="9" rx="3" fill="#475569"/>
+    <rect x="58" y="190" width="124" height="9" rx="3" fill="#ef4444" opacity="0.75"/>
+    <rect x="58" y="208" width="96"  height="9" rx="3" fill="#22c55e" opacity="0.85"/>
+    <rect x="58" y="226" width="118" height="9" rx="3" fill="#22c55e" opacity="0.85"/>
+    <rect x="58" y="244" width="80"  height="9" rx="3" fill="#475569"/>
+    <rect x="58" y="262" width="104" height="9" rx="3" fill="#22c55e" opacity="0.85"/>
+    <rect x="58" y="280" width="122" height="9" rx="3" fill="#475569"/>
+    <rect x="58" y="298" width="70"  height="9" rx="3" fill="#ef4444" opacity="0.75"/>
+    <rect x="58" y="316" width="112" height="9" rx="3" fill="#22c55e" opacity="0.85"/>
+    <rect x="58" y="334" width="90"  height="9" rx="3" fill="#475569"/>
+    <text x="120" y="372" text-anchor="middle" font-size="12" fill="#94a3b8">GitHub PR or local branch</text>
+  </g>
+
+  <!-- ============ 2. Skip noise ============ -->
+  <g>
+    <rect x="230" y="120" width="170" height="270" rx="14" fill="#1e293b" stroke="#334155"/>
+    <text x="250" y="150" font-size="14" font-weight="700" fill="#f1f5f9">Changed files</text>
+
+    <g font-size="12.5">
+      <text x="252" y="190" fill="#64748b">package-lock.json</text>
+      <line x1="250" y1="186" x2="358" y2="186" stroke="#f87171" stroke-width="1.6"/>
+      <text x="252" y="225" fill="#64748b">bundle.min.js</text>
+      <line x1="250" y1="221" x2="334" y2="221" stroke="#f87171" stroke-width="1.6"/>
+      <text x="252" y="260" fill="#64748b">logo.png</text>
+      <line x1="250" y1="256" x2="304" y2="256" stroke="#f87171" stroke-width="1.6"/>
+
+      <rect x="244" y="279" width="142" height="28" rx="7" fill="#22c55e" opacity="0.15"/>
+      <circle cx="260" cy="293" r="7" fill="#22c55e"/>
+      <path d="M256.5,293 l2.5,2.5 l4.5,-5" stroke="#0f172a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <text x="274" y="297" fill="#bbf7d0" font-weight="600">api/orders.py</text>
+    </g>
+    <text x="315" y="345" text-anchor="middle" font-size="12" fill="#94a3b8">lockfiles, minified,</text>
+    <text x="315" y="362" text-anchor="middle" font-size="12" fill="#94a3b8">generated &amp; binary</text>
+    <text x="315" y="379" text-anchor="middle" font-size="12" fill="#94a3b8">files are skipped</text>
+  </g>
+
+  <!-- ============ 3. Context ============ -->
+  <g>
+    <rect x="430" y="120" width="170" height="270" rx="14" fill="#1e293b" stroke="#334155"/>
+    <text x="450" y="150" font-size="14" font-weight="700" fill="#f1f5f9">Context</text>
+    <!-- main file -->
+    <rect x="465" y="170" width="100" height="62" rx="8" fill="#312e81" stroke="#818cf8"/>
+    <text x="515" y="196" text-anchor="middle" font-size="12" font-weight="600" fill="#e0e7ff">orders.py</text>
+    <text x="515" y="215" text-anchor="middle" font-size="10.5" fill="#a5b4fc">full file</text>
+    <!-- callers -->
+    <line x1="490" y1="232" x2="475" y2="272" stroke="#818cf8" stroke-dasharray="4 3"/>
+    <line x1="540" y1="232" x2="555" y2="272" stroke="#818cf8" stroke-dasharray="4 3"/>
+    <rect x="440" y="272" width="72" height="34" rx="7" fill="#1e293b" stroke="#6366f1"/>
+    <text x="476" y="293" text-anchor="middle" font-size="11" fill="#c7d2fe">cart.py</text>
+    <rect x="520" y="272" width="72" height="34" rx="7" fill="#1e293b" stroke="#6366f1"/>
+    <text x="556" y="293" text-anchor="middle" font-size="11" fill="#c7d2fe">checkout.py</text>
+    <text x="515" y="345" text-anchor="middle" font-size="12" fill="#94a3b8">the changed code plus</text>
+    <text x="515" y="362" text-anchor="middle" font-size="12" fill="#94a3b8">the places that call it,</text>
+    <text x="515" y="379" text-anchor="middle" font-size="12" fill="#94a3b8">so breakage is visible</text>
+  </g>
+
+  <!-- ============ 4. Specialists ============ -->
+  <g font-size="14" font-weight="600">
+    <!-- correctness -->
+    <rect x="650" y="122" width="190" height="50" rx="25" fill="#3b82f6" fill-opacity="0.15" stroke="#60a5fa"/>
+    <circle cx="675" cy="147" r="13" fill="#3b82f6"/>
+    <text x="675" y="152" text-anchor="middle" font-size="13" fill="#fff">✓</text>
+    <text x="697" y="152" fill="#dbeafe">Correctness</text>
+    <circle cx="806" cy="147" r="4" fill="#93c5fd"/><circle cx="817" cy="147" r="4" fill="#93c5fd"/><circle cx="828" cy="147" r="4" fill="#93c5fd"/>
+    <!-- security -->
+    <rect x="650" y="190" width="190" height="50" rx="25" fill="#ef4444" fill-opacity="0.15" stroke="#f87171"/>
+    <circle cx="675" cy="215" r="13" fill="#ef4444"/>
+    <path d="M675,206 l7,3 v5 c0,4 -3,7 -7,9 c-4,-2 -7,-5 -7,-9 v-5 z" fill="#fff"/>
+    <text x="697" y="220" fill="#fee2e2">Security</text>
+    <circle cx="817" cy="215" r="4" fill="#fca5a5"/><circle cx="828" cy="215" r="4" fill="#fca5a5"/>
+    <!-- performance -->
+    <rect x="650" y="258" width="190" height="50" rx="25" fill="#f59e0b" fill-opacity="0.15" stroke="#fbbf24"/>
+    <circle cx="675" cy="283" r="13" fill="#f59e0b"/>
+    <path d="M677,274 l-7,11 h5 l-2,8 l7,-11 h-5 z" fill="#fff"/>
+    <text x="697" y="288" fill="#fef3c7">Performance</text>
+    <circle cx="806" cy="283" r="4" fill="#fcd34d"/><circle cx="817" cy="283" r="4" fill="#fcd34d"/><circle cx="828" cy="283" r="4" fill="#fcd34d"/>
+    <!-- tests -->
+    <rect x="650" y="326" width="190" height="50" rx="25" fill="#22c55e" fill-opacity="0.15" stroke="#4ade80"/>
+    <circle cx="675" cy="351" r="13" fill="#22c55e"/>
+    <path d="M672,343 h6 M673,343 v6 l-5,8 h14 l-5,-8 v-6" stroke="#fff" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+    <text x="697" y="356" fill="#dcfce7">Tests</text>
+    <circle cx="828" cy="351" r="4" fill="#86efac"/>
+  </g>
+  <text x="745" y="400" text-anchor="middle" font-size="12" fill="#94a3b8">run in parallel · 9 possible issues</text>
+
+  <!-- ============ 5. Verifier ============ -->
+  <g>
+    <rect x="880" y="120" width="150" height="270" rx="14" fill="#1e293b" stroke="#a78bfa" filter="url(#glow)"/>
+    <path d="M955,138 l26,10 v18 c0,16 -11,27 -26,33 c-15,-6 -26,-17 -26,-33 v-18 z" fill="#7c3aed" stroke="#c4b5fd" stroke-width="1.5"/>
+    <path d="M944,166 l8,8 l14,-15" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="955" y="224" text-anchor="middle" font-size="14" font-weight="700" fill="#ede9fe">Verifier</text>
+    <g font-size="12">
+      <circle cx="902" cy="250" r="7" fill="#22c55e"/><path d="M898.5,250 l2.5,2.5 l4.5,-5" stroke="#0f172a" stroke-width="2" fill="none"/>
+      <rect x="916" y="246" width="96" height="8" rx="3" fill="#475569"/>
+      <circle cx="902" cy="275" r="7" fill="#22c55e"/><path d="M898.5,275 l2.5,2.5 l4.5,-5" stroke="#0f172a" stroke-width="2" fill="none"/>
+      <rect x="916" y="271" width="80" height="8" rx="3" fill="#475569"/>
+      <circle cx="902" cy="300" r="7" fill="#ef4444"/><path d="M899,297 l6,6 M905,297 l-6,6" stroke="#fff" stroke-width="1.8"/>
+      <rect x="916" y="296" width="90" height="8" rx="3" fill="#334155"/>
+      <circle cx="902" cy="325" r="7" fill="#ef4444"/><path d="M899,322 l6,6 M905,322 l-6,6" stroke="#fff" stroke-width="1.8"/>
+      <rect x="916" y="321" width="70" height="8" rx="3" fill="#334155"/>
+    </g>
+    <text x="955" y="362" text-anchor="middle" font-size="12" fill="#94a3b8">stronger model re-reads</text>
+    <text x="955" y="379" text-anchor="middle" font-size="12" fill="#94a3b8">the code: real or not?</text>
+  </g>
+
+  <!-- ============ 6. Posted ============ -->
+  <g>
+    <rect x="1060" y="140" width="110" height="70" rx="12" fill="#f8fafc"/>
+    <path d="M1078,210 l0,14 l14,-14 z" fill="#f8fafc"/>
+    <circle cx="1076" cy="158" r="6" fill="#ef4444"/>
+    <rect x="1088" y="154" width="66" height="8" rx="3" fill="#334155"/>
+    <rect x="1072" y="172" width="86" height="6" rx="3" fill="#94a3b8"/>
+    <rect x="1072" y="185" width="70" height="6" rx="3" fill="#94a3b8"/>
+    <text x="1072" y="203" font-size="9.5" fill="#7c3aed" font-weight="600">✓ verified</text>
+
+    <rect x="1060" y="250" width="110" height="70" rx="12" fill="#f8fafc"/>
+    <path d="M1078,320 l0,14 l14,-14 z" fill="#f8fafc"/>
+    <circle cx="1076" cy="268" r="6" fill="#f59e0b"/>
+    <rect x="1088" y="264" width="58" height="8" rx="3" fill="#334155"/>
+    <rect x="1072" y="282" width="86" height="6" rx="3" fill="#94a3b8"/>
+    <rect x="1072" y="295" width="60" height="6" rx="3" fill="#94a3b8"/>
+    <text x="1072" y="313" font-size="9.5" fill="#7c3aed" font-weight="600">✓ verified</text>
+
+    <text x="1115" y="362" text-anchor="middle" font-size="12" fill="#94a3b8">comments on</text>
+    <text x="1115" y="379" text-anchor="middle" font-size="12" fill="#94a3b8">the exact line</text>
+  </g>
+
+  <!-- ============ arrows ============ -->
+  <g stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <line x1="202" y1="255" x2="226" y2="255"/>
+    <line x1="402" y1="255" x2="426" y2="255"/>
+    <!-- fan out -->
+    <path d="M602,255 C625,255 625,147 646,147"/>
+    <path d="M602,255 C625,255 625,215 646,215"/>
+    <path d="M602,255 C625,255 625,283 646,283"/>
+    <path d="M602,255 C625,255 625,351 646,351"/>
+    <!-- fan in -->
+    <path d="M842,147 C862,147 858,255 876,255"/>
+    <path d="M842,215 C862,215 858,255 876,255"/>
+    <path d="M842,283 C862,283 858,255 876,255"/>
+    <path d="M842,351 C862,351 858,255 876,255"/>
+    <line x1="1032" y1="235" x2="1056" y2="235"/>
+  </g>
+
+  <!-- ============ step labels ============ -->
+  <g font-size="13" font-weight="700" fill="#e2e8f0" text-anchor="middle">
+    <circle cx="120" cy="428" r="13" fill="#6366f1"/><text x="120" y="433" fill="#fff">1</text>
+    <text x="120" y="460">Read the PR</text>
+    <circle cx="315" cy="428" r="13" fill="#6366f1"/><text x="315" y="433" fill="#fff">2</text>
+    <text x="315" y="460">Skip noise</text>
+    <circle cx="515" cy="428" r="13" fill="#6366f1"/><text x="515" y="433" fill="#fff">3</text>
+    <text x="515" y="460">Gather context</text>
+    <circle cx="745" cy="428" r="13" fill="#6366f1"/><text x="745" y="433" fill="#fff">4</text>
+    <text x="745" y="460">4 AI specialists review</text>
+    <circle cx="955" cy="428" r="13" fill="#6366f1"/><text x="955" y="433" fill="#fff">5</text>
+    <text x="955" y="460">Verify every finding</text>
+    <circle cx="1115" cy="428" r="13" fill="#6366f1"/><text x="1115" y="433" fill="#fff">6</text>
+    <text x="1115" y="460">Post</text>
+  </g>
+
+  <!-- ============ funnel ============ -->
+  <line x1="40" y1="488" x2="1160" y2="488" stroke="#334155"/>
+  <text x="40" y="540" font-size="14" font-weight="700" fill="#cbd5e1">The funnel</text>
+  <g text-anchor="middle">
+    <rect x="200" y="508" width="190" height="56" rx="12" fill="#334155"/>
+    <text x="295" y="535" font-size="22" font-weight="800" fill="#f8fafc">9</text>
+    <text x="295" y="555" font-size="12" fill="#cbd5e1">possible issues</text>
+
+    <rect x="460" y="508" width="190" height="56" rx="12" fill="#3730a3"/>
+    <text x="555" y="535" font-size="22" font-weight="800" fill="#f8fafc">4</text>
+    <text x="555" y="555" font-size="12" fill="#c7d2fe">after dedupe + confidence</text>
+
+    <rect x="720" y="508" width="190" height="56" rx="12" fill="#6d28d9"/>
+    <text x="815" y="535" font-size="22" font-weight="800" fill="#f8fafc">2</text>
+    <text x="815" y="555" font-size="12" fill="#ede9fe">confirmed by verifier</text>
+
+    <rect x="980" y="508" width="180" height="56" rx="12" fill="#16a34a"/>
+    <text x="1070" y="535" font-size="22" font-weight="800" fill="#f8fafc">2</text>
+    <text x="1070" y="555" font-size="12" fill="#dcfce7">comments posted</text>
+  </g>
+  <g stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)">
+    <line x1="396" y1="536" x2="454" y2="536"/>
+    <line x1="656" y1="536" x2="714" y2="536"/>
+    <line x1="916" y1="536" x2="974" y2="536"/>
+  </g>
+</svg>
