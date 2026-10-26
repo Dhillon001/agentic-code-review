@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from reviewer.agents.llm import LLM
-from reviewer.agents.prompts import COMMON_RULES, FINDINGS_TOOL, SPECIALIST_FOCUS
+from reviewer.agents.prompts import COMMON_RULES, FINDINGS_TOOL, SPECIALIST_FOCUS, with_team_rules
 from reviewer.config import Settings
 from reviewer.context.retriever import render_file_excerpt
 from reviewer.models import FileContext, Finding, PRContext
@@ -22,6 +22,9 @@ class Specialist:
     @property
     def system(self) -> str:
         return f"You are the `{self.name}` reviewer.\nFocus ONLY on: {self.focus}\n\n{COMMON_RULES}"
+
+    def system_prompt(self, rules: str = "") -> str:
+        return with_team_rules(self.system, rules)
 
 
 SPECIALISTS = [Specialist(name, focus) for name, focus in SPECIALIST_FOCUS.items()]
@@ -54,7 +57,7 @@ async def run_specialist(
 ) -> list[Finding]:
     data = await llm.call_tool(
         model=settings.reviewer_model,
-        system=spec.system,
+        system=spec.system_prompt(settings.rules),
         user=build_review_prompt(pr, files, settings),
         tool=FINDINGS_TOOL,
     )

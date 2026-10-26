@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     min_confidence: float = 0.5  # drop raw findings below this before verification
     min_severity: str = "medium"  # low | medium | high | critical
     max_comments: int = 10  # hard cap on comments posted per PR
+    ignore: list[str] = Field(default_factory=list)  # path globs never reviewed (.acr.yml extends)
+    rules: str = ""  # team conventions injected into reviewer prompts (usually from .acr.yml)
 
     # Context building
     max_files: int = 50

@@ -13,9 +13,11 @@ class FakeLLM:
         self.findings_by_agent = findings_by_agent
         self.reject = reject
         self.calls: list[str] = []
+        self.systems: list[str] = []
 
     async def call_tool(self, *, model, system, user, tool, max_tokens=8000):
         self.calls.append(tool["name"])
+        self.systems.append(system)
         if tool["name"] == "report_findings":
             agent = system.split("`")[1]  # "You are the `<name>` reviewer."
             return {"findings": self.findings_by_agent.get(agent, [])}

@@ -12,6 +12,16 @@ You are reviewing a pull request. Rules:
 - An empty findings list is a perfectly good answer.
 """
 
+TEAM_RULES_HEADER = """\
+Team conventions for this repository (from its .acr.yml). A clear violation on a changed line is a
+real finding (category `team-rule`); do not stretch them to cover code they don't address:
+"""
+
+
+def with_team_rules(system: str, rules: str) -> str:
+    return f"{system}\n{TEAM_RULES_HEADER}{rules}\n" if rules.strip() else system
+
+
 SPECIALIST_FOCUS = {
     "correctness": (
         "Logic and correctness: off-by-one errors, wrong conditions, null/None handling, broken "

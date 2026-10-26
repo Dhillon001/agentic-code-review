@@ -5,7 +5,7 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 
 ## Mon Oct 26
 
-- [ ] **Per-repo config (`.acr.yml`).** Load an optional `.acr.yml` from the repo root (via the `Source`) with
+- [x] **Per-repo config (`.acr.yml`).** Load an optional `.acr.yml` from the repo root (via the `Source`) with
   `ignore` (glob list), `min_severity`, `max_comments`, and `rules` (free-text team conventions). Merge over
   `Settings`; inject `rules` into every specialist's system prompt. Add `pyyaml` dependency. Document in README.
 - [ ] **Skip noise files.** Before context building, drop lockfiles (`*.lock`, `package-lock.json`, `poetry.lock`, …),

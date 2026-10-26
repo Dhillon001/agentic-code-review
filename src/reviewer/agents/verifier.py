@@ -7,7 +7,7 @@ import json
 from collections import defaultdict
 
 from reviewer.agents.llm import LLM
-from reviewer.agents.prompts import VERDICTS_TOOL, VERIFIER_SYSTEM
+from reviewer.agents.prompts import VERDICTS_TOOL, VERIFIER_SYSTEM, with_team_rules
 from reviewer.config import Settings
 from reviewer.context.retriever import render_file_excerpt
 from reviewer.models import FileContext, Finding, Severity
@@ -26,7 +26,10 @@ async def _verify_file(
         f"=== FINDINGS TO VERIFY ===\n{json.dumps(listing, indent=2)}"
     )
     data = await llm.call_tool(
-        model=settings.verifier_model, system=VERIFIER_SYSTEM, user=user, tool=VERDICTS_TOOL
+        model=settings.verifier_model,
+        system=with_team_rules(VERIFIER_SYSTEM, settings.rules),
+        user=user,
+        tool=VERDICTS_TOOL,
     )
     verdicts = {v.get("index"): v for v in data.get("verdicts", [])}
 
