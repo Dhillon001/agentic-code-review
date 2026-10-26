@@ -44,6 +44,9 @@ def parse_unified_diff(text: str) -> list[FileDiff]:
                 continue
             if raw.startswith("--- "):
                 continue
+            if raw.startswith(("Binary files ", "GIT binary patch")):
+                cur.binary = True
+                continue
 
         m = HUNK_RE.match(raw)
         if m:

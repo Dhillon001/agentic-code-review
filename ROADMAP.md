@@ -8,7 +8,7 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 - [x] **Per-repo config (`.acr.yml`).** Load an optional `.acr.yml` from the repo root (via the `Source`) with
   `ignore` (glob list), `min_severity`, `max_comments`, and `rules` (free-text team conventions). Merge over
   `Settings`; inject `rules` into every specialist's system prompt. Add `pyyaml` dependency. Document in README.
-- [ ] **Skip noise files.** Before context building, drop lockfiles (`*.lock`, `package-lock.json`, `poetry.lock`, …),
+- [x] **Skip noise files.** Before context building, drop lockfiles (`*.lock`, `package-lock.json`, `poetry.lock`, …),
   minified/generated files (`*.min.js`, `*_pb2.py`, `dist/`, `vendor/`, `node_modules/`), and binary diffs.
   Defaults live in one list; `.acr.yml` `ignore` extends it. Report skipped count in `ReviewResult.stats`.
 

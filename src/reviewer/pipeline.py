@@ -38,7 +38,7 @@ async def review(
     specialists = specialists or SPECIALISTS
     reviewable = [fc for fc in pr.files if fc.diff.status != "deleted" and fc.diff.hunks]
     if not reviewable:
-        return ReviewResult(stats={"files": 0})
+        return ReviewResult(stats={"files": 0, "skipped": len(pr.skipped)})
 
     batches = batch_files(reviewable, settings)
     tasks = [run_specialist(llm, s, pr, b, settings) for s in specialists for b in batches]
@@ -70,6 +70,7 @@ async def review(
         rejected=rejected,
         stats={
             "files": len(reviewable),
+            "skipped": len(pr.skipped),
             "batches": len(batches),
             "agent_calls": len(tasks),
             "agent_errors": errors,

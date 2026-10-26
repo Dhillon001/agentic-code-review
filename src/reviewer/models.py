@@ -55,6 +55,7 @@ class FileDiff(BaseModel):
     old_path: str | None = None
     status: Literal["added", "modified", "deleted", "renamed"] = "modified"
     hunks: list[Hunk] = Field(default_factory=list)
+    binary: bool = False  # "Binary files ... differ" / "GIT binary patch": nothing to review
 
     @property
     def commentable_lines(self) -> set[int]:
@@ -95,6 +96,7 @@ class PRContext(BaseModel):
     body: str = ""
     head_sha: str | None = None
     files: list[FileContext] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)  # paths dropped as noise or ignored before review
 
 
 # ---------------------------------------------------------------- findings

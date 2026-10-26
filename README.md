@@ -72,6 +72,12 @@ rules: |             # team conventions, added to every reviewer's and the verif
   - Public functions in api/ validate input with pydantic models.
 ```
 
+Noise is skipped before any context is fetched: lockfiles (`*.lock`, `package-lock.json`, `pnpm-lock.yaml`,
+`go.sum`, …), minified/bundled files (`*.min.js`, `*.min.css`, source maps), generated code (`*_pb2.py`, `*.pb.go`,
+`*.generated.*`), `dist/`, `vendor/`, `node_modules/`, and binary diffs. The defaults are the single list
+`NOISE_PATTERNS` in `src/reviewer/ingest/noise.py`; `ignore` adds to it. The number of files dropped either way is
+reported as `skipped` in the review stats.
+
 `rules` may also be a YAML list of strings (capped at 4,000 chars). For GitHub PRs the file is read from the
 **base** branch, so a PR can't loosen its own review; `acr local` reads it from the head ref. Invalid YAML is
 ignored and invalid fields fall back to defaults — a bad config never blocks a review.

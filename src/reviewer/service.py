@@ -9,11 +9,12 @@ from reviewer.config import Settings
 from reviewer.context.retriever import build_context
 from reviewer.ingest.diff import parse_unified_diff
 from reviewer.ingest.github import GitHubClient
+from reviewer.ingest.noise import split_noise
 from reviewer.ingest.sources import GitHubSource, LocalGitSource
 from reviewer.models import PRContext, ReviewResult
 from reviewer.output.github_review import post_review
 from reviewer.pipeline import review
-from reviewer.repo_config import apply_repo_config, filter_ignored, load_repo_config
+from reviewer.repo_config import apply_repo_config, load_repo_config
 
 
 def make_llm(settings: Settings) -> LLM:
@@ -35,13 +36,15 @@ async def context_from_github(
     if base_sha:
         settings = apply_repo_config(settings, await load_repo_config(GitHubSource(client, repo, base_sha)))
     source = GitHubSource(client, head_repo, head["sha"])
+    diffs, skipped = split_noise(diffs, settings.ignore)
     ctx = PRContext(
         repo=repo,
         number=number,
         title=pr.get("title") or "",
         body=pr.get("body") or "",
         head_sha=head["sha"],
-        files=await build_context(source, filter_ignored(diffs, settings.ignore), settings),
+        files=await build_context(source, diffs, settings),
+        skipped=skipped,
     )
     return ctx, settings
 
@@ -52,11 +55,12 @@ async def context_from_local(
     """Local runs are trusted, so `.acr.yml` is read from the head ref (commit it to try changes)."""
     source = LocalGitSource(repo, base, head)
     settings = apply_repo_config(settings, await load_repo_config(source))
-    diffs = parse_unified_diff(source.diff())
+    diffs, skipped = split_noise(parse_unified_diff(source.diff()), settings.ignore)
     ctx = PRContext(
         repo=str(source.repo),
         title=f"{head} vs {base}",
-        files=await build_context(source, filter_ignored(diffs, settings.ignore), settings),
+        files=await build_context(source, diffs, settings),
+        skipped=skipped,
     )
     return ctx, settings
 
