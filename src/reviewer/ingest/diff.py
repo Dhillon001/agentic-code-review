@@ -68,3 +68,31 @@ def parse_unified_diff(text: str) -> list[FileDiff]:
             new_line += 1
 
     return files
+
+
+def _span(h: Hunk) -> tuple[int, int]:
+    """New-file line range a hunk touches. A pure deletion still marks the spot where lines went."""
+    n = len(h.added_lines) + len(h.context_lines)
+    return h.new_start, h.new_start + max(n, 1) - 1
+
+
+def restrict_to_changes(pr_files: list[FileDiff], changed: list[FileDiff]) -> list[FileDiff]:
+    """Keep only the PR hunks that overlap a hunk in `changed` (e.g. the diff of new commits).
+
+    We filter the *PR* diff rather than reviewing `changed` directly because GitHub only accepts inline
+    comments on lines in the PR diff; a hunk from the commit range alone may not be commentable."""
+    spans: dict[str, list[tuple[int, int]]] = {}
+    for fd in changed:
+        spans.setdefault(fd.path, []).extend(_span(h) for h in fd.hunks)
+    out: list[FileDiff] = []
+    for fd in pr_files:
+        ranges = spans.get(fd.path)
+        if not ranges:
+            continue
+        hunks = [
+            h for h in fd.hunks
+            if any(a <= _span(h)[1] and _span(h)[0] <= b for a, b in ranges)
+        ]
+        if hunks:
+            out.append(fd.model_copy(update={"hunks": hunks}))
+    return out

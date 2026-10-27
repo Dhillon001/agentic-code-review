@@ -6,13 +6,24 @@ from reviewer.ingest.github import GitHubClient
 from reviewer.models import Finding, PRContext, ReviewResult
 
 ICON = {"critical": "🛑", "high": "🔴", "medium": "🟠", "low": "🟡"}
+FOOTER = "<sub>agent: "  # every comment we post carries this; it's how we recognise our own comments
+
+
+def bot_commented_lines(comments: list[dict]) -> set[tuple[str, int]]:
+    """(path, line) pairs this reviewer already commented on, from GitHub's review-comments payload.
+    Outdated comments (line no longer in the diff) have `line: null` and are ignored."""
+    return {
+        (c["path"], c["line"])
+        for c in comments
+        if FOOTER in (c.get("body") or "") and c.get("path") and c.get("line") is not None
+    }
 
 
 def format_comment(f: Finding) -> str:
     out = f"{ICON[f.severity.value]} **{f.severity.value.title()} · {f.category}** — {f.title}\n\n{f.detail}"
     if f.suggestion:
         out += f"\n\n**Suggested fix:** {f.suggestion}"
-    out += f"\n\n<sub>agent: {f.agent} · confidence {f.confidence:.0%}{' · verified' if f.verified else ''}</sub>"
+    out += f"\n\n{FOOTER}{f.agent} · confidence {f.confidence:.0%}{' · verified' if f.verified else ''}</sub>"
     return out
 
 

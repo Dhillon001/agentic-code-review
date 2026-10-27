@@ -151,6 +151,17 @@ An inline comment looks like this:
 >
 > <sub>9 raw → 4 candidates → 2 verified · 2 rejected by verifier</sub>
 
+### Re-reviews 🔁
+
+When new commits land on a PR, the reviewer doesn't start from scratch:
+
+- **Only new work is reviewed.** On a `synchronize` event the previous head (`before`) becomes `--since`; only
+  the PR hunks that overlap `since...head` go to the agents. If GitHub can't compare the two (the old head was
+  force-pushed away), it falls back to a full review rather than skip anything.
+- **No repeated comments.** Before verifying, findings on a `(file, line)` the bot already has a live comment on
+  are dropped (recognised by the `agent: …` footer), so you never see the same remark twice.
+- **Quiet when there's nothing new.** An incremental pass that finds nothing posts nothing.
+
 ---
 
 <a id="quickstart"></a>
@@ -174,6 +185,7 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr local --repo ../other --base develop --head feature-x` | Review any local repo / refs |
 | `acr pr owner/repo 123` | Review a GitHub PR and print the results |
 | `acr pr owner/repo 123 --post` | …and post it as a real PR review |
+| `acr pr owner/repo 123 --since <sha>` | Incremental: only review hunks changed since `<sha>` |
 | `acr ... --json` | Full machine-readable `ReviewResult` |
 | `acr -v ...` | Verbose logging |
 
@@ -181,7 +193,8 @@ Every run ends with a stats line showing the whole funnel:
 
 ```text
 stats: {'files': 3, 'skipped': 2, 'batches': 1, 'agent_calls': 4, 'agent_errors': 0,
-        'raw_findings': 9, 'candidates': 4, 'confirmed': 2, 'rejected': 2, 'posted': 2}
+        'raw_findings': 9, 'already_commented': 0, 'candidates': 4, 'confirmed': 2, 'rejected': 2,
+        'posted': 2}
 ```
 
 | Stat | Meaning |
@@ -189,6 +202,7 @@ stats: {'files': 3, 'skipped': 2, 'batches': 1, 'agent_calls': 4, 'agent_errors'
 | `files` / `skipped` | Files reviewed / files dropped as noise or ignored |
 | `batches` · `agent_calls` · `agent_errors` | How the work was split, and how many model calls failed (failures never sink the review) |
 | `raw_findings` → `candidates` → `confirmed` | The funnel: everything the agents said → after confidence floor + dedupe → after the verifier |
+| `already_commented` | Findings dropped because the bot already commented on that exact line in an earlier review |
 | `rejected` · `posted` | Killed by the verifier · actually posted after ranking and the cap |
 
 ---
@@ -283,7 +297,8 @@ Reviews every PR automatically. No server needed.
 For **another** repo, copy the workflow and change `pip install .` to
 `pip install git+https://github.com/Dhillon001/agentic-code-review`.
 
-Draft PRs are skipped. A new push cancels the review that's still running.
+Draft PRs are skipped. On a push, only the new commits are reviewed. A new push cancels the review
+that's still running.
 
 </td>
 <td width="50%" valign="top">
@@ -300,7 +315,8 @@ docker run -p 8000:8000 --env-file .env acr
 Then add a GitHub webhook:
 **Pull requests** events · JSON · secret = `GITHUB_WEBHOOK_SECRET` · URL = `https://<host>/webhook`.
 
-Signatures are checked with HMAC-SHA256, reviews run in the background, and `/healthz` is there for your
+Signatures are checked with HMAC-SHA256, pushes (`synchronize`) are reviewed incrementally, reviews run
+in the background, and `/healthz` is there for your
 load balancer.
 
 </td>
@@ -402,7 +418,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 
 - [x] Per-repo config (`.acr.yml`)
 - [x] Skip noise files
-- [ ] Incremental re-review (only new commits, no duplicate comments)
+- [x] Incremental re-review (only new commits, no duplicate comments)
 - [ ] Prompt caching for the shared PR context
 - [ ] Token, cost, and latency tracking
 - [ ] More eval cases

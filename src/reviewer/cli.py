@@ -1,5 +1,6 @@
 """
-acr pr owner/repo 123 [--post] [--json]     review a GitHub PR (optionally post the review)
+acr pr owner/repo 123 [--post] [--since SHA] [--json]
+                                            review a GitHub PR (optionally post; --since = only new commits)
 acr local [--repo .] [--base main]          review your current branch against a base
 """
 
@@ -38,6 +39,7 @@ def main() -> None:
     pr.add_argument("repo", help="owner/repo")
     pr.add_argument("number", type=int)
     pr.add_argument("--post", action="store_true", help="post the review to GitHub")
+    pr.add_argument("--since", metavar="SHA", help="only review hunks changed since this commit")
     pr.add_argument("--json", action="store_true")
 
     lo = sub.add_parser("local", help="review a local branch")
@@ -51,7 +53,9 @@ def main() -> None:
     settings = get_settings()
 
     if args.cmd == "pr":
-        result = asyncio.run(review_github_pr(args.repo, args.number, settings, post=args.post))
+        result = asyncio.run(
+            review_github_pr(args.repo, args.number, settings, post=args.post, since_sha=args.since or None)
+        )
     else:
         result = asyncio.run(review_local(args.repo, args.base, args.head, settings))
 

@@ -28,7 +28,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: acr pr ${{ github.repository }} ${{ github.event.pull_request.number }} --post
+        # On a push, review only what the new commits touched.
+        run: >-
+          acr pr ${{ github.repository }} ${{ github.event.pull_request.number }} --post
+          ${{ github.event.action == 'synchronize' && format('--since {0}', github.event.before) || '' }}
 
   tests:
     runs-on: ubuntu-latest

@@ -33,8 +33,14 @@ def batch_files(files: list[FileContext], settings: Settings) -> list[list[FileC
 
 
 async def review(
-    pr: PRContext, llm: LLM, settings: Settings, specialists: list[Specialist] | None = None
+    pr: PRContext,
+    llm: LLM,
+    settings: Settings,
+    specialists: list[Specialist] | None = None,
+    already_commented: set[tuple[str, int]] | None = None,
 ) -> ReviewResult:
+    """`already_commented`: (file, line) pairs we posted on in an earlier review; findings there are
+    dropped before verification so a re-review never repeats itself (and never pays to re-verify)."""
     specialists = specialists or SPECIALISTS
     reviewable = [fc for fc in pr.files if fc.diff.status != "deleted" and fc.diff.hunks]
     if not reviewable:
@@ -54,6 +60,9 @@ async def review(
             raw.extend(r)
 
     candidates = dedupe([f for f in raw if f.confidence >= settings.min_confidence])
+    seen = already_commented or set()
+    repeats = [f for f in candidates if (f.file, f.line) in seen]
+    candidates = [f for f in candidates if (f.file, f.line) not in seen]
     files_by_path = {fc.path: fc for fc in reviewable}
 
     if settings.verify and candidates:
@@ -63,6 +72,8 @@ async def review(
 
     ranked = rank(confirmed, settings.min_severity, settings.max_comments)
     inline, summary_only = place(ranked, files_by_path)
+    snapped_repeats = [f for f in inline if (f.file, f.line) in seen]  # snapped onto an old comment
+    inline = [f for f in inline if (f.file, f.line) not in seen]
 
     return ReviewResult(
         inline=inline,
@@ -75,6 +86,7 @@ async def review(
             "agent_calls": len(tasks),
             "agent_errors": errors,
             "raw_findings": len(raw),
+            "already_commented": len(repeats) + len(snapped_repeats),
             "candidates": len(candidates),
             "confirmed": len(confirmed),
             "rejected": len(rejected),

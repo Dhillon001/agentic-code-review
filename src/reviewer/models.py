@@ -95,6 +95,7 @@ class PRContext(BaseModel):
     title: str = ""
     body: str = ""
     head_sha: str | None = None
+    since_sha: str | None = None  # incremental re-review: only hunks changed since this commit
     files: list[FileContext] = Field(default_factory=list)
     skipped: list[str] = Field(default_factory=list)  # paths dropped as noise or ignored before review
 

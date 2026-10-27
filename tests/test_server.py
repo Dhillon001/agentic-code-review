@@ -12,8 +12,8 @@ def _client(monkeypatch):
     monkeypatch.setattr(server, "get_settings", lambda: Settings(_env_file=None, github_webhook_secret="s3cret"))
     queued = []
 
-    async def fake_run(repo, number):
-        queued.append((repo, number))
+    async def fake_run(repo, number, since=None):
+        queued.append((repo, number, since))
 
     monkeypatch.setattr(server, "_run", fake_run)
     return TestClient(server.app), queued
@@ -35,7 +35,16 @@ def test_queues_opened_pr(monkeypatch):
                        "repository": {"full_name": "o/r"}}).encode()
     r = c.post("/webhook", content=body, headers={"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": _sig(body)})
     assert r.json() == {"queued": True}
-    assert queued == [("o/r", 7)]
+    assert queued == [("o/r", 7, None)]
+
+
+def test_synchronize_reviews_only_new_commits(monkeypatch):
+    c, queued = _client(monkeypatch)
+    body = json.dumps({"action": "synchronize", "before": "abc123", "pull_request": {"number": 7, "draft": False},
+                       "repository": {"full_name": "o/r"}}).encode()
+    r = c.post("/webhook", content=body, headers={"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": _sig(body)})
+    assert r.json() == {"queued": True}
+    assert queued == [("o/r", 7, "abc123")]
 
 
 def test_ignores_drafts(monkeypatch):

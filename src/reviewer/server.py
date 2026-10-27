@@ -23,9 +23,9 @@ def signature_ok(secret: str, body: bytes, signature: str | None) -> bool:
     return hmac.compare_digest(expected, signature or "")
 
 
-async def _run(repo: str, number: int) -> None:
+async def _run(repo: str, number: int, since_sha: str | None = None) -> None:
     try:
-        result = await review_github_pr(repo, number, get_settings(), post=True)
+        result = await review_github_pr(repo, number, get_settings(), post=True, since_sha=since_sha)
         log.info("reviewed %s#%s: %s", repo, number, result.stats)
     except Exception:  # background task: log, never crash the server
         log.exception("review failed for %s#%s", repo, number)
@@ -57,5 +57,7 @@ async def webhook(
     if payload.get("action") not in TRIGGER_ACTIONS or pr.get("draft"):
         return {"ignored": payload.get("action")}
 
-    background.add_task(_run, payload["repository"]["full_name"], pr["number"])
+    # On a push, `before` is the previous head: review only what the new commits touched.
+    since = payload.get("before") if payload.get("action") == "synchronize" else None
+    background.add_task(_run, payload["repository"]["full_name"], pr["number"], since)
     return {"queued": True}
