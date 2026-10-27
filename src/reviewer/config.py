@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     reviewer_model: str = "claude-sonnet-5-5"
     verifier_model: str = "claude-opus-5-5"
     llm_concurrency: int = 4
+    # Run one specialist per batch before the rest so the shared-context prompt cache is written
+    # once and read by the others (parallel cold calls would each pay the full input price).
+    cache_warmup: bool = True
 
     # Pipeline behaviour
     verify: bool = True

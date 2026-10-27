@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from reviewer.agents.llm import LLM
+from reviewer.agents.llm import LLM, UserContent, cached_text, text_block
 from reviewer.agents.prompts import COMMON_RULES, FINDINGS_TOOL, SPECIALIST_FOCUS, with_team_rules
 from reviewer.config import Settings
 from reviewer.context.retriever import render_file_excerpt
@@ -20,11 +20,18 @@ class Specialist:
     focus: str
 
     @property
-    def system(self) -> str:
-        return f"You are the `{self.name}` reviewer.\nFocus ONLY on: {self.focus}\n\n{COMMON_RULES}"
+    def instructions(self) -> str:
+        """The per-specialist part of the prompt. Sent *after* the shared PR context so that the
+        system prompt and context prefix are byte-identical across specialists (prompt caching)."""
+        return (
+            f"You are the `{self.name}` reviewer.\nFocus ONLY on: {self.focus}\n"
+            "Review the pull request above from that angle only and report your findings."
+        )
 
-    def system_prompt(self, rules: str = "") -> str:
-        return with_team_rules(self.system, rules)
+
+def reviewer_system(rules: str = "") -> str:
+    """System prompt shared by every specialist. Must not vary per specialist, or the cache misses."""
+    return with_team_rules(COMMON_RULES, rules)
 
 
 SPECIALISTS = [Specialist(name, focus) for name, focus in SPECIALIST_FOCUS.items()]
@@ -52,13 +59,25 @@ def build_review_prompt(pr: PRContext, files: list[FileContext], settings: Setti
     return f"{header}\n{render_files(files, settings)}"
 
 
+def build_specialist_content(spec: Specialist, shared_context: str) -> UserContent:
+    """Shared PR context first (cache breakpoint), specialist focus last."""
+    return [cached_text(shared_context), text_block(spec.instructions)]
+
+
 async def run_specialist(
-    llm: LLM, spec: Specialist, pr: PRContext, files: list[FileContext], settings: Settings
+    llm: LLM,
+    spec: Specialist,
+    pr: PRContext,
+    files: list[FileContext],
+    settings: Settings,
+    shared_context: str | None = None,
 ) -> list[Finding]:
+    if shared_context is None:
+        shared_context = build_review_prompt(pr, files, settings)
     data = await llm.call_tool(
         model=settings.reviewer_model,
-        system=spec.system_prompt(settings.rules),
-        user=build_review_prompt(pr, files, settings),
+        system=reviewer_system(settings.rules),
+        user=build_specialist_content(spec, shared_context),
         tool=FINDINGS_TOOL,
     )
     allowed = {fc.path for fc in files}

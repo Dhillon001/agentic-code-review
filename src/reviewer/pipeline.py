@@ -6,10 +6,16 @@ import asyncio
 import logging
 
 from reviewer.agents.llm import LLM
-from reviewer.agents.specialists import SPECIALISTS, Specialist, render_files, run_specialist
+from reviewer.agents.specialists import (
+    SPECIALISTS,
+    Specialist,
+    build_review_prompt,
+    render_files,
+    run_specialist,
+)
 from reviewer.agents.verifier import verify
 from reviewer.config import Settings
-from reviewer.models import FileContext, PRContext, ReviewResult
+from reviewer.models import FileContext, Finding, PRContext, ReviewResult
 from reviewer.ranking import dedupe, place, rank
 
 log = logging.getLogger(__name__)
@@ -32,6 +38,24 @@ def batch_files(files: list[FileContext], settings: Settings) -> list[list[FileC
     return batches
 
 
+async def _review_batch(
+    llm: LLM, specialists: list[Specialist], pr: PRContext, batch: list[FileContext], settings: Settings
+) -> list[list[Finding] | BaseException]:
+    """Every specialist reviews one batch. The PR context is rendered once and sent byte-identical to
+    each of them, so after the first call the rest read it from the prompt cache."""
+    shared = build_review_prompt(pr, batch, settings)
+
+    async def one(spec: Specialist) -> list[Finding]:
+        return await run_specialist(llm, spec, pr, batch, settings, shared_context=shared)
+
+    head: list[list[Finding] | BaseException] = []
+    rest = specialists
+    if settings.cache_warmup and len(specialists) > 1:
+        head = list(await asyncio.gather(one(specialists[0]), return_exceptions=True))
+        rest = specialists[1:]
+    return head + list(await asyncio.gather(*(one(s) for s in rest), return_exceptions=True))
+
+
 async def review(
     pr: PRContext,
     llm: LLM,
@@ -47,8 +71,8 @@ async def review(
         return ReviewResult(stats={"files": 0, "skipped": len(pr.skipped)})
 
     batches = batch_files(reviewable, settings)
-    tasks = [run_specialist(llm, s, pr, b, settings) for s in specialists for b in batches]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    per_batch = await asyncio.gather(*(_review_batch(llm, specialists, pr, b, settings) for b in batches))
+    results = [r for batch_results in per_batch for r in batch_results]
 
     raw = []
     errors = 0
@@ -83,7 +107,7 @@ async def review(
             "files": len(reviewable),
             "skipped": len(pr.skipped),
             "batches": len(batches),
-            "agent_calls": len(tasks),
+            "agent_calls": len(results),
             "agent_errors": errors,
             "raw_findings": len(raw),
             "already_commented": len(repeats) + len(snapped_repeats),

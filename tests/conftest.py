@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
+from reviewer.agents.llm import as_text
 from reviewer.config import Settings
 
 
@@ -14,16 +17,18 @@ class FakeLLM:
         self.reject = reject
         self.calls: list[str] = []
         self.systems: list[str] = []
+        self.users: list = []  # raw `user` content as sent (str or content blocks)
 
     async def call_tool(self, *, model, system, user, tool, max_tokens=8000):
         self.calls.append(tool["name"])
         self.systems.append(system)
+        self.users.append(user)
+        user = as_text(user)
         if tool["name"] == "report_findings":
-            agent = system.split("`")[1]  # "You are the `<name>` reviewer."
+            agent = re.search(r"You are the `(\w+)` reviewer", user).group(1)
             return {"findings": self.findings_by_agent.get(agent, [])}
         # verifier: parse the listing back out of the prompt
         import json
-        import re
 
         file = re.search(r"=== FILE: (.+?) ===", user).group(1)
         listing = json.loads(user.split("=== FINDINGS TO VERIFY ===\n", 1)[1])

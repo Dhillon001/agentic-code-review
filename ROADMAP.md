@@ -17,7 +17,7 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 - [x] **Incremental review.** New `GitHubClient.list_review_comments`; on re-review, (a) when a `since_sha` is given,
   only review hunks from `git compare since_sha...head`, and (b) drop findings on a (file, line) the bot already
   commented on. Wire `before` SHA from the `synchronize` webhook payload; add `--since` to `acr pr`.
-- [ ] **Prompt caching.** Restructure specialist calls so the shared PR context is an identical leading content
+- [x] **Prompt caching.** Restructure specialist calls so the shared PR context is an identical leading content
   block with `cache_control: {"type": "ephemeral"}` and the specialist focus comes after it. Keep the `LLM`
   protocol backward compatible (FakeLLM must still work). Note the cost rationale in README.
 

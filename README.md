@@ -111,6 +111,22 @@ the exact line, explain concretely what goes wrong, give an honest confidence sc
 Output is collected with **forced tool use** (a JSON schema the model must fill in), so there's no fragile
 text parsing. Findings that are malformed or point at files outside the batch are thrown away.
 
+#### 💸 Prompt caching
+
+Four specialists reading the same batch means the same diff, file excerpts, and related snippets are sent
+four times. Each specialist call is laid out so that everything shared comes first and is **byte-identical**:
+
+```
+tools (report_findings)  →  system (common rules + team rules)  →  [PR context ⟵ cache_control: ephemeral]  →  [specialist focus]
+```
+
+Only the short specialist focus differs, and it sits *after* the cache breakpoint. The first specialist on a
+batch writes the cache (~1.25× input price for that prefix); the other three read it at ~0.1×. For a typical
+batch where the context dominates the prompt, that cuts specialist input cost by roughly 60–65% and also
+trims time-to-first-token. To make sure the cache exists before the others ask for it, one specialist runs
+first and the rest follow in parallel (`CACHE_WARMUP=false` trades that small latency hit for full
+parallelism). Prompts under the model's minimum cacheable length simply aren't cached; nothing breaks.
+
 ### Stage 4 — Verifier 🕵️
 
 Findings below `MIN_CONFIDENCE` are dropped, and near-duplicates from different agents (same file, within
@@ -221,6 +237,7 @@ stats: {'files': 3, 'skipped': 2, 'batches': 1, 'agent_calls': 4, 'agent_errors'
 | `REVIEWER_MODEL` | `claude-sonnet-5-5` | Faster model that runs the four specialists |
 | `VERIFIER_MODEL` | `claude-opus-5-5` | Stronger model that verifies findings |
 | `LLM_CONCURRENCY` | `4` | Max model calls in flight |
+| `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
 | `VERIFY` | `true` | Turn the verifier off (useful for evals) |
 | `MIN_CONFIDENCE` | `0.5` | Drop agent findings below this before verification |
 | `MIN_SEVERITY` | `medium` | `low` · `medium` · `high` · `critical` |
@@ -419,7 +436,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] Per-repo config (`.acr.yml`)
 - [x] Skip noise files
 - [x] Incremental re-review (only new commits, no duplicate comments)
-- [ ] Prompt caching for the shared PR context
+- [x] Prompt caching for the shared PR context
 - [ ] Token, cost, and latency tracking
 - [ ] More eval cases
 - [ ] One-click GitHub ` ```suggestion ` blocks
