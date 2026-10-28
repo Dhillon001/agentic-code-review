@@ -14,6 +14,7 @@ from reviewer.config import get_settings
 from reviewer.models import ReviewResult
 from reviewer.output.github_review import ICON
 from reviewer.service import review_github_pr, review_local
+from reviewer.usage import format_usage
 
 
 def print_result(result: ReviewResult) -> None:
@@ -28,6 +29,7 @@ def print_result(result: ReviewResult) -> None:
             print(f"   fix: {f.suggestion}")
         print()
     print("stats:", result.stats)
+    print("usage:", format_usage(result.usage))
 
 
 def main() -> None:

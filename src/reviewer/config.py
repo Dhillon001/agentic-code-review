@@ -3,6 +3,8 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from reviewer.usage import DEFAULT_PRICES, ModelPrice
+
 
 class Settings(BaseSettings):
     """All knobs live here. Override via env vars or a .env file (see .env.example)."""
@@ -21,6 +23,9 @@ class Settings(BaseSettings):
     # Run one specialist per batch before the rest so the shared-context prompt cache is written
     # once and read by the others (parallel cold calls would each pay the full input price).
     cache_warmup: bool = True
+    # USD per million tokens, keyed by model name or prefix (longest match wins). Used for the
+    # estimated cost in the usage footer; override as JSON, e.g. {"claude-opus": {"input": 5, "output": 25}}.
+    model_prices: dict[str, ModelPrice] = Field(default_factory=lambda: dict(DEFAULT_PRICES))
 
     # Pipeline behaviour
     verify: bool = True

@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from reviewer.usage import Usage
+
 
 class Severity(str, Enum):
     CRITICAL = "critical"
@@ -122,3 +124,4 @@ class ReviewResult(BaseModel):
     summary_only: list[Finding] = Field(default_factory=list)  # real issue, but off-diff
     rejected: list[Finding] = Field(default_factory=list)  # killed by verifier (kept for evals)
     stats: dict[str, int] = Field(default_factory=dict)
+    usage: Usage = Field(default_factory=Usage)  # tokens, estimated cost, and wall time for this review

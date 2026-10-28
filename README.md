@@ -166,6 +166,8 @@ An inline comment looks like this:
 > 🤖 **Agentic review:** 🔴 1 high · 🟠 1 medium
 >
 > <sub>9 raw → 4 candidates → 2 verified · 2 rejected by verifier</sub>
+>
+> <sub>💸 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s</sub>
 
 ### Re-reviews 🔁
 
@@ -205,12 +207,13 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr ... --json` | Full machine-readable `ReviewResult` |
 | `acr -v ...` | Verbose logging |
 
-Every run ends with a stats line showing the whole funnel:
+Every run ends with a stats line showing the whole funnel, and a usage line showing what it cost:
 
 ```text
 stats: {'files': 3, 'skipped': 2, 'batches': 1, 'agent_calls': 4, 'agent_errors': 0,
         'raw_findings': 9, 'already_commented': 0, 'candidates': 4, 'confirmed': 2, 'rejected': 2,
         'posted': 2}
+usage: 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s
 ```
 
 | Stat | Meaning |
@@ -220,6 +223,16 @@ stats: {'files': 3, 'skipped': 2, 'batches': 1, 'agent_calls': 4, 'agent_errors'
 | `raw_findings` → `candidates` → `confirmed` | The funnel: everything the agents said → after confidence floor + dedupe → after the verifier |
 | `already_commented` | Findings dropped because the bot already commented on that exact line in an earlier review |
 | `rejected` · `posted` | Killed by the verifier · actually posted after ranking and the cap |
+
+#### 💸 Usage: tokens, cost, latency
+
+Every model call records its input, output, and cache-read/cache-write tokens plus latency; the review totals
+them in `ReviewResult.usage` (per model too, under `by_model` in `--json`). The same one-line footer appears in
+the CLI, at the bottom of the GitHub summary review, and in the webhook server's log. "in" counts all input
+tokens, with the cache hits in brackets, so you can see prompt caching pay off. The dollar figure is an
+**estimate** from the `MODEL_PRICES` table (USD per million tokens, matched by model name or prefix; cache reads
+default to 0.1× and cache writes to 1.25× the input price). Calls to a model with no price are flagged as
+`unpriced` rather than silently counted as free.
 
 ---
 
@@ -238,6 +251,7 @@ stats: {'files': 3, 'skipped': 2, 'batches': 1, 'agent_calls': 4, 'agent_errors'
 | `VERIFIER_MODEL` | `claude-opus-5-5` | Stronger model that verifies findings |
 | `LLM_CONCURRENCY` | `4` | Max model calls in flight |
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
+| `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
 | `VERIFY` | `true` | Turn the verifier off (useful for evals) |
 | `MIN_CONFIDENCE` | `0.5` | Drop agent findings below this before verification |
 | `MIN_SEVERITY` | `medium` | `low` · `medium` · `high` · `critical` |
@@ -400,6 +414,7 @@ src/reviewer/
 ├── pipeline.py          # orchestration: batch → fan out → dedupe → verify → rank → place
 ├── ranking.py           # dedupe · severity/cap ranking · snap-to-diff-line
 ├── repo_config.py       # .acr.yml loading, merging, and glob matching
+├── usage.py             # per-call token/latency records, price table, cost estimate, usage footer
 ├── output/
 │   └── github_review.py # comment + summary formatting, posting
 ├── service.py           # shared entry points for CLI / server / Action
@@ -437,7 +452,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] Skip noise files
 - [x] Incremental re-review (only new commits, no duplicate comments)
 - [x] Prompt caching for the shared PR context
-- [ ] Token, cost, and latency tracking
+- [x] Token, cost, and latency tracking
 - [ ] More eval cases
 - [ ] One-click GitHub ` ```suggestion ` blocks
 - [ ] 👍/👎 feedback report: precision per agent

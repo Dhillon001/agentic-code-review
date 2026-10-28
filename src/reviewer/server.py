@@ -11,6 +11,7 @@ from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 
 from reviewer.config import get_settings
 from reviewer.service import review_github_pr
+from reviewer.usage import format_usage
 
 log = logging.getLogger(__name__)
 app = FastAPI(title="Agentic Code Review")
@@ -26,7 +27,7 @@ def signature_ok(secret: str, body: bytes, signature: str | None) -> bool:
 async def _run(repo: str, number: int, since_sha: str | None = None) -> None:
     try:
         result = await review_github_pr(repo, number, get_settings(), post=True, since_sha=since_sha)
-        log.info("reviewed %s#%s: %s", repo, number, result.stats)
+        log.info("reviewed %s#%s: %s | %s", repo, number, result.stats, format_usage(result.usage))
     except Exception:  # background task: log, never crash the server
         log.exception("review failed for %s#%s", repo, number)
 

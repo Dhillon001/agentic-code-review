@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from reviewer.agents.llm import LLM
 from reviewer.agents.specialists import (
@@ -17,6 +18,7 @@ from reviewer.agents.verifier import verify
 from reviewer.config import Settings
 from reviewer.models import FileContext, Finding, PRContext, ReviewResult
 from reviewer.ranking import dedupe, place, rank
+from reviewer.usage import recording, summarize
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +66,23 @@ async def review(
     already_commented: set[tuple[str, int]] | None = None,
 ) -> ReviewResult:
     """`already_commented`: (file, line) pairs we posted on in an earlier review; findings there are
-    dropped before verification so a re-review never repeats itself (and never pays to re-verify)."""
+    dropped before verification so a re-review never repeats itself (and never pays to re-verify).
+
+    Every model call made during the review is tallied into `ReviewResult.usage`."""
+    t0 = time.perf_counter()
+    with recording() as calls:
+        result = await _review(pr, llm, settings, specialists, already_commented)
+    result.usage = summarize(calls, settings.model_prices, time.perf_counter() - t0)
+    return result
+
+
+async def _review(
+    pr: PRContext,
+    llm: LLM,
+    settings: Settings,
+    specialists: list[Specialist] | None,
+    already_commented: set[tuple[str, int]] | None,
+) -> ReviewResult:
     specialists = specialists or SPECIALISTS
     reviewable = [fc for fc in pr.files if fc.diff.status != "deleted" and fc.diff.hunks]
     if not reviewable:

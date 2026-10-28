@@ -4,6 +4,7 @@ from collections import Counter
 
 from reviewer.ingest.github import GitHubClient
 from reviewer.models import Finding, PRContext, ReviewResult
+from reviewer.usage import format_usage
 
 ICON = {"critical": "🛑", "high": "🔴", "medium": "🟠", "low": "🟡"}
 FOOTER = "<sub>agent: "  # every comment we post carries this; it's how we recognise our own comments
@@ -29,8 +30,9 @@ def format_comment(f: Finding) -> str:
 
 def format_summary(result: ReviewResult) -> str:
     posted = result.inline + result.summary_only
+    usage = f"\n\n<sub>💸 {format_usage(result.usage)}</sub>" if result.usage.calls else ""
     if not posted:
-        return "🤖 **Agentic review:** no issues found that survived verification."
+        return "🤖 **Agentic review:** no issues found that survived verification." + usage
     counts = Counter(f.severity.value for f in posted)
     tally = " · ".join(f"{ICON[s]} {counts[s]} {s}" for s in ICON if counts[s])
     lines = [f"🤖 **Agentic review:** {tally}"]
@@ -43,7 +45,7 @@ def format_summary(result: ReviewResult) -> str:
         f"\n<sub>{s.get('raw_findings', 0)} raw → {s.get('candidates', 0)} candidates → "
         f"{s.get('confirmed', 0)} verified · {s.get('rejected', 0)} rejected by verifier</sub>"
     )
-    return "\n".join(lines)
+    return "\n".join(lines) + usage
 
 
 async def post_review(client: GitHubClient, pr: PRContext, result: ReviewResult) -> dict:
