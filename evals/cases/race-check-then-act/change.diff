@@ -1,0 +1,21 @@
+diff --git a/app/inventory.py b/app/inventory.py
+--- a/app/inventory.py
++++ b/app/inventory.py
+@@ -1,13 +1,10 @@
+ """In-memory stock ledger. reserve() is called concurrently from request worker threads."""
+-import threading
+ 
+-_lock = threading.Lock()
+ _stock: dict[str, int] = {"widget": 5}
+ 
+ 
+ def reserve(item: str, qty: int) -> bool:
+-    with _lock:
+-        if _stock.get(item, 0) < qty:
+-            return False
+-        _stock[item] -= qty
+-        return True
++    if _stock.get(item, 0) < qty:
++        return False
++    _stock[item] -= qty
++    return True

@@ -373,11 +373,18 @@ python evals/run_evals.py --only sql-injection
 |---|---|
 | `off-by-one-pagination` | Catches a logic bug in a small diff |
 | `sql-injection` | Catches a security bug |
+| `race-check-then-act` | Catches a check-then-act race after a lock is removed |
+| `path-traversal` | Catches user input joined into a filesystem path |
+| `n-plus-one-query` | Catches a query issued per item inside a loop |
+| `none-deref-after-changed-return` | Catches a caller dereferencing a function that can now return `None` |
+| `untested-branch` | Flags a new branch with no test covering it |
 | `clean-refactor` | Says **nothing** on a harmless change (false-positive guard) |
+| `clean-any-refactor` | Says **nothing** on a loop rewritten as `any()` |
 
 A finding counts as a hit if it's in the right file within ±3 lines. To add a case, create
 `evals/cases/<name>/` with `case.json` (title + expected findings), `change.diff`, and `files/` (the
-post-change sources).
+post-change sources). `pytest` checks that every case loads, that its diff matches `files/`, and that
+each expected line is one GitHub would accept an inline comment on.
 
 ---
 
@@ -453,7 +460,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] Incremental re-review (only new commits, no duplicate comments)
 - [x] Prompt caching for the shared PR context
 - [x] Token, cost, and latency tracking
-- [ ] More eval cases
+- [x] More eval cases
 - [ ] One-click GitHub ` ```suggestion ` blocks
 - [ ] 👍/👎 feedback report: precision per agent
 - [ ] Pluggable embedding retrieval

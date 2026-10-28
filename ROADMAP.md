@@ -26,7 +26,7 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 - [x] **Usage tracking.** `AnthropicLLM` records input/output/cache-read tokens and latency per call; the pipeline
   aggregates into `ReviewResult.usage` (tokens, est. USD via a per-model price table in config, wall time).
   Show a one-line usage footer in the GitHub summary and in CLI output.
-- [ ] **More eval cases.** Add six cases under `evals/cases/` in the existing format: race condition (check-then-act),
+- [x] **More eval cases.** Add six cases under `evals/cases/` in the existing format: race condition (check-then-act),
   path traversal, N+1 query in a loop, new branch without a test, None dereference after a changed return,
   and one more clean refactor. Add a test that every case loads and its expected lines are commentable.
 

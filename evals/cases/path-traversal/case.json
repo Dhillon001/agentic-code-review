@@ -1,0 +1,10 @@
+{
+  "title": "Support files in upload subfolders",
+  "expected": [
+    {
+      "file": "app/downloads.py",
+      "line": 9,
+      "category": "security"
+    }
+  ]
+}

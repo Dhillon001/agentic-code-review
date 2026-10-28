@@ -1,0 +1,10 @@
+{
+  "title": "Simplify order summary query",
+  "expected": [
+    {
+      "file": "app/reports.py",
+      "line": 5,
+      "category": "performance"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Remove lock from reserve() hot path",
+  "expected": [
+    {
+      "file": "app/inventory.py",
+      "line": 7,
+      "category": "correctness"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+diff --git a/app/accounts.py b/app/accounts.py
+--- a/app/accounts.py
++++ b/app/accounts.py
+@@ -6,8 +6,8 @@ def account_email(account_id: int) -> str:
+     return get_account(account_id).email
+ 
+ 
+-def get_account(account_id: int) -> Account:
++def get_account(account_id: int) -> Account | None:
+     row = fetch_row("accounts", account_id)
+     if row is None:
+-        raise LookupError(f"account {account_id} not found")
++        return None
+     return Account(**row)

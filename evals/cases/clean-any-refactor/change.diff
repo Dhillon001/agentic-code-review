@@ -1,0 +1,10 @@
+diff --git a/app/permissions.py b/app/permissions.py
+--- a/app/permissions.py
++++ b/app/permissions.py
+@@ -1,5 +1,2 @@
+ def has_admin(users) -> bool:
+-    for user in users:
+-        if user.role == "admin":
+-            return True
+-    return False
++    return any(user.role == "admin" for user in users)

@@ -1,0 +1,10 @@
+{
+  "title": "Add HALFOFF discount code",
+  "expected": [
+    {
+      "file": "app/discounts.py",
+      "line": 4,
+      "category": "tests"
+    }
+  ]
+}

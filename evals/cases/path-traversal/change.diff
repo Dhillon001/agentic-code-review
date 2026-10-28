@@ -1,0 +1,12 @@
+diff --git a/app/downloads.py b/app/downloads.py
+--- a/app/downloads.py
++++ b/app/downloads.py
+@@ -6,7 +6,7 @@ UPLOAD_DIR = Path("/srv/uploads")
+ 
+ 
+ def download(filename: str):
+-    path = UPLOAD_DIR / Path(filename).name
++    path = UPLOAD_DIR / filename
+     if not path.is_file():
+         abort(404)
+     return send_file(path)

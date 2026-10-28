@@ -1,0 +1,19 @@
+diff --git a/app/reports.py b/app/reports.py
+--- a/app/reports.py
++++ b/app/reports.py
+@@ -1,9 +1,7 @@
+ def order_summaries(db, customer_ids: list[int]) -> list[dict]:
+-    placeholders = ",".join("?" * len(customer_ids))
+-    rows = db.execute(
+-        "SELECT c.name, COALESCE(SUM(o.total), 0) AS total FROM customers c "
+-        "LEFT JOIN orders o ON o.customer_id = c.id "
+-        f"WHERE c.id IN ({placeholders}) GROUP BY c.id",
+-        customer_ids,
+-    ).fetchall()
+-    return [{"customer": r["name"], "total": r["total"]} for r in rows]
++    summaries = []
++    for cid in customer_ids:
++        customer = db.execute("SELECT name FROM customers WHERE id = ?", (cid,)).fetchone()
++        orders = db.execute("SELECT total FROM orders WHERE customer_id = ?", (cid,)).fetchall()
++        summaries.append({"customer": customer["name"], "total": sum(o["total"] for o in orders)})
++    return summaries

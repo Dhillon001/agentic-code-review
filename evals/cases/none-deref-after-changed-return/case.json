@@ -1,0 +1,10 @@
+{
+  "title": "Return None instead of raising for missing accounts",
+  "expected": [
+    {
+      "file": "app/accounts.py",
+      "line": 6,
+      "category": "correctness"
+    }
+  ]
+}
