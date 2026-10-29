@@ -30,7 +30,8 @@ def rank(findings: list[Finding], min_severity: str, max_comments: int) -> list[
 def place(
     findings: list[Finding], files_by_path: dict[str, FileContext], snap: int = 3
 ) -> tuple[list[Finding], list[Finding]]:
-    """Split into inline (line is in the diff) vs summary-only. Snap to a nearby diff line if close."""
+    """Split into inline (line is in the diff) vs summary-only. Snap to a nearby diff line if close
+    (dropping any `replacement`, which only applies to the line it was written for)."""
     inline, summary = [], []
     for f in findings:
         fc = files_by_path.get(f.file)
@@ -40,7 +41,8 @@ def place(
             continue
         near = sorted((ln for ln in lines if abs(ln - f.line) <= snap), key=lambda ln: abs(ln - f.line))
         if near:
-            inline.append(f.model_copy(update={"line": near[0]}))
+            # a replacement was written for the original line; applied to the snapped one it would clobber it
+            inline.append(f.model_copy(update={"line": near[0], "replacement": None}))
         else:
             summary.append(f)
     return inline, summary

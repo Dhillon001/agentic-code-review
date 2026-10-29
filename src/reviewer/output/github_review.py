@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 from reviewer.ingest.github import GitHubClient
@@ -20,9 +21,20 @@ def bot_commented_lines(comments: list[dict]) -> set[tuple[str, int]]:
     }
 
 
+def suggestion_block(replacement: str) -> str:
+    """A GitHub ```suggestion block; the fence grows past any backtick run inside the replacement."""
+    runs = [len(m) for m in re.findall(r"`+", replacement)]
+    fence = "`" * max(3, max(runs, default=0) + 1)
+    return f"{fence}suggestion\n{replacement}\n{fence}"
+
+
 def format_comment(f: Finding) -> str:
     out = f"{ICON[f.severity.value]} **{f.severity.value.title()} · {f.category}** — {f.title}\n\n{f.detail}"
-    if f.suggestion:
+    replacement = f.single_line_replacement
+    if replacement is not None:
+        out += "\n\n**Suggested change:**" + (f" {f.suggestion}" if f.suggestion else "")
+        out += f"\n\n{suggestion_block(replacement)}"
+    elif f.suggestion:
         out += f"\n\n**Suggested fix:** {f.suggestion}"
     out += f"\n\n{FOOTER}{f.agent} · confidence {f.confidence:.0%}{' · verified' if f.verified else ''}</sub>"
     return out

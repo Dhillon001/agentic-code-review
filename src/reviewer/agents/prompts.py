@@ -60,6 +60,13 @@ FINDINGS_TOOL = {
                         "title": {"type": "string", "description": "<= 80 chars"},
                         "detail": {"type": "string", "description": "what breaks, concretely"},
                         "suggestion": {"type": "string", "description": "how to fix (optional)"},
+                        "replacement": {
+                            "type": "string",
+                            "description": (
+                                "optional: the exact full new content of the cited line, including its "
+                                "indentation, when a one-line edit fixes the issue. Omit otherwise."
+                            ),
+                        },
                         "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                     },
                     "required": ["file", "line", "severity", "category", "title", "detail", "confidence"],
@@ -78,6 +85,8 @@ For each finding, check it against the actual code shown:
 - confirmed: the issue is real, on (or right next to) the cited line, and caused/exposed by this change.
 - rejected: speculative, already handled elsewhere in the shown code, a style preference, wrong line,
   or not something this PR introduced.
+A `replacement`, when present, is posted as a one-click change to the cited line: reject the finding if
+that new line content is wrong or would not compile.
 You may adjust severity if the original is clearly over- or under-stated. Be brief in notes.
 """
 

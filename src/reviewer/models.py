@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from reviewer.usage import Usage
 
@@ -114,9 +114,24 @@ class Finding(BaseModel):
     title: str
     detail: str
     suggestion: str | None = None
+    replacement: str | None = None  # exact new content for `line`; rendered as a GitHub suggestion block
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     verified: bool = False
     verifier_note: str | None = None
+
+    @field_validator("replacement")
+    @classmethod
+    def _normalise_replacement(cls, v: str | None) -> str | None:
+        """Drop a trailing newline; treat an empty replacement as "no replacement" (never a silent delete)."""
+        if v is None:
+            return None
+        v = v.rstrip("\r\n")
+        return v if v.strip() else None
+
+    @property
+    def single_line_replacement(self) -> str | None:
+        """The replacement, if it is one line and can safely become a one-click suggestion."""
+        return self.replacement if self.replacement is not None and "\n" not in self.replacement else None
 
 
 class ReviewResult(BaseModel):

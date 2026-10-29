@@ -17,7 +17,14 @@ async def _verify_file(
     llm: LLM, fc: FileContext, findings: list[Finding], settings: Settings
 ) -> tuple[list[Finding], list[Finding]]:
     listing = [
-        {"index": i, **f.model_dump(include={"line", "severity", "category", "title", "detail"}, mode="json")}
+        {
+            "index": i,
+            **f.model_dump(
+                include={"line", "severity", "category", "title", "detail", "replacement"},
+                mode="json",
+                exclude_none=True,
+            ),
+        }
         for i, f in enumerate(findings)
     ]
     user = (

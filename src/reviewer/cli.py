@@ -27,6 +27,8 @@ def print_result(result: ReviewResult) -> None:
         print(f"   {f.detail}")
         if f.suggestion:
             print(f"   fix: {f.suggestion}")
+        if f.single_line_replacement is not None:
+            print(f"   replace line {f.line} with: {f.single_line_replacement}")
         print()
     print("stats:", result.stats)
     print("usage:", format_usage(result.usage))

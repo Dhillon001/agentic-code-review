@@ -157,9 +157,21 @@ An inline comment looks like this:
 >
 > `page=1` skips the first page of results: the offset is computed as `page * size` instead of `(page - 1) * size`.
 >
-> **Suggested fix:** use `(page - 1) * size`.
+> **Suggested change:** subtract one before scaling.
+>
+> ````
+> ```suggestion
+>     offset = (page - 1) * size
+> ```
+> ````
 >
 > <sub>agent: correctness · confidence 90% · verified</sub>
+
+When a one-line edit fixes the issue, the specialist also returns `replacement` — the exact new content of the
+cited line — and the comment carries a GitHub ` ```suggestion ` block the author can apply with one click
+("Commit suggestion"). The verifier sees the replacement too and rejects the finding if the new line is wrong.
+Multi-line replacements, and findings that were *snapped* to a nearby line, fall back to a prose
+**Suggested fix:** so a click can never overwrite the wrong line.
 
 …and the summary review shows a severity tally plus the funnel, so you can see the filtering at work:
 
@@ -461,7 +473,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] Prompt caching for the shared PR context
 - [x] Token, cost, and latency tracking
 - [x] More eval cases
-- [ ] One-click GitHub ` ```suggestion ` blocks
+- [x] One-click GitHub ` ```suggestion ` blocks
 - [ ] 👍/👎 feedback report: precision per agent
 - [ ] Pluggable embedding retrieval
 - [ ] Better symbol detection for JS/TS, Go, Java/Kotlin

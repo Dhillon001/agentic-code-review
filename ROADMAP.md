@@ -32,7 +32,7 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 
 ## Thu Oct 29
 
-- [ ] **Suggestion blocks.** Add optional `replacement` (exact new line content) to the findings tool schema and
+- [x] **Suggestion blocks.** Add optional `replacement` (exact new line content) to the findings tool schema and
   `Finding`. When present and the finding is single-line, render a GitHub ```` ```suggestion ```` block in the inline
   comment instead of prose "Suggested fix".
 - [ ] **Feedback report.** `acr feedback owner/repo [--days 30]`: fetch the bot's review comments and their
