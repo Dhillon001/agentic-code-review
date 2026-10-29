@@ -8,6 +8,7 @@ from pathlib import Path
 from reviewer.agents.llm import LLM, AnthropicLLM
 from reviewer.config import Settings
 from reviewer.context.retriever import build_context
+from reviewer.feedback import FeedbackReport, fetch_feedback
 from reviewer.ingest.diff import parse_unified_diff, restrict_to_changes
 from reviewer.ingest.github import GitHubClient
 from reviewer.ingest.noise import split_noise
@@ -97,3 +98,10 @@ async def review_github_pr(
 async def review_local(repo: str | Path, base: str, head: str, settings: Settings) -> ReviewResult:
     pr, settings = await context_from_local(repo, base, head, settings)
     return await review(pr, make_llm(settings), settings)
+
+
+async def feedback_report(repo: str, settings: Settings, days: int = 30) -> FeedbackReport:
+    if not settings.github_token:
+        raise SystemExit("GITHUB_TOKEN is not set")
+    async with GitHubClient(settings.github_token) as gh:
+        return await fetch_feedback(gh, repo, days)

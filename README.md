@@ -216,7 +216,8 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr pr owner/repo 123` | Review a GitHub PR and print the results |
 | `acr pr owner/repo 123 --post` | …and post it as a real PR review |
 | `acr pr owner/repo 123 --since <sha>` | Incremental: only review hunks changed since `<sha>` |
-| `acr ... --json` | Full machine-readable `ReviewResult` |
+| `acr feedback owner/repo --days 30` | How useful were the bot's comments? 👍/👎 precision per agent and category |
+| `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
 | `acr -v ...` | Verbose logging |
 
 Every run ends with a stats line showing the whole funnel, and a usage line showing what it cost:
@@ -245,6 +246,26 @@ tokens, with the cache hits in brackets, so you can see prompt caching pay off. 
 **estimate** from the `MODEL_PRICES` table (USD per million tokens, matched by model name or prefix; cache reads
 default to 0.1× and cache writes to 1.25× the input price). Calls to a model with no price are flagged as
 `unpriced` rather than silently counted as free.
+
+#### 👍 Feedback: which agents earn their keep?
+
+Reviewers react to the bot's inline comments with 👍 or 👎. `acr feedback owner/repo [--days 30]` pulls every
+inline comment on the repo from that window (`--days 0` = all time), keeps only this bot's (recognised by the
+`agent:` footer, which also gives the agent and the category), and prints precision overall, per agent, and per
+category:
+
+```text
+Feedback on acme/api (last 30 days): 42 comments, 18 rated, precision 78%
+
+agent        comments  rated   👍   👎  precision
+correctness        21     10    9    2        80%
+security           12      5    4    1        80%
+...
+```
+
+A comment counts as **useful** when its 👍 outnumber its 👎; precision is useful ÷ rated, where rated means
+it got at least one 👍 or 👎. Unrated comments are counted but don't move precision. A low-precision agent or
+category is the place to raise the confidence floor or tighten the prompt.
 
 ---
 
@@ -434,6 +455,7 @@ src/reviewer/
 ├── ranking.py           # dedupe · severity/cap ranking · snap-to-diff-line
 ├── repo_config.py       # .acr.yml loading, merging, and glob matching
 ├── usage.py             # per-call token/latency records, price table, cost estimate, usage footer
+├── feedback.py          # 👍/👎 reactions on posted comments → precision per agent / category
 ├── output/
 │   └── github_review.py # comment + summary formatting, posting
 ├── service.py           # shared entry points for CLI / server / Action

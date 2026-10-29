@@ -67,6 +67,22 @@ class GitHubClient:
                 break
         return out
 
+    async def list_repo_review_comments(self, repo: str, since: str | None = None, max_pages: int = 10) -> list[dict]:
+        """Inline review comments across every PR in the repo, newest first. `since` (ISO 8601) is GitHub's
+        filter on *updated_at*, so callers should still check `created_at` themselves."""
+        params: dict = {"per_page": 100, "sort": "created", "direction": "desc"}
+        if since:
+            params["since"] = since
+        out: list[dict] = []
+        for page in range(1, max_pages + 1):
+            r = await self._http.get(f"/repos/{repo}/pulls/comments", params={**params, "page": page})
+            r.raise_for_status()
+            batch = r.json()
+            out.extend(batch)
+            if len(batch) < 100:
+                break
+        return out
+
     async def get_file(self, repo: str, path: str, ref: str) -> str | None:
         r = await self._http.get(
             f"/repos/{repo}/contents/{path}",
