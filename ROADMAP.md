@@ -44,7 +44,7 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 - [x] **Pluggable embedding retrieval.** `Retriever` protocol with the current lexical implementation as default and
   an `EmbeddingRetriever` (chunk files, embed via an injectable `embed(texts) -> list[list[float]]`, cosine top-k).
   Selected by `retriever: lexical|embedding` setting. Tests use a deterministic fake embedder.
-- [ ] **Multi-language symbols.** Improve `changed_symbols` for JS/TS (`function`, `const x = (…) =>`, class methods,
+- [x] **Multi-language symbols.** Improve `changed_symbols` for JS/TS (`function`, `const x = (…) =>`, class methods,
   `export default function`), Go (`func (r *T) Name`), and Java/Kotlin methods. Table-driven tests per language.
 
 ## Sat Oct 31

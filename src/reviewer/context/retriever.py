@@ -10,25 +10,98 @@ from __future__ import annotations
 
 import asyncio
 import re
+from pathlib import PurePosixPath
 from typing import Protocol
 
 from reviewer.config import Settings
 from reviewer.ingest.sources import Source
 from reviewer.models import FileContext, FileDiff, RelatedSnippet
 
+# Fallback for languages without their own patterns (Python, Rust, Ruby, ...).
 SYMBOL_RE = re.compile(r"\b(?:def|class|function|func|fn|interface|struct|type)\s+([A-Za-z_]\w*)")
+
+# Words that look like a call/definition head (`if (`, `return foo(`) but never name a symbol.
+_KEYWORDS = frozenset({
+    "if", "else", "for", "while", "do", "switch", "case", "catch", "try", "finally", "return", "throw", "new",
+    "delete", "typeof", "instanceof", "await", "yield", "function", "constructor", "super", "this", "import",
+    "export", "from", "default", "in", "of", "with", "when", "is", "as", "sizeof", "synchronized", "assert",
+})
+
+_JS_PATTERNS = [
+    # function foo(  /  async function* foo(  /  export default function foo(
+    re.compile(r"\bfunction\s*\*?\s*([A-Za-z_$][\w$]*)"),
+    re.compile(r"\b(?:class|interface|enum)\s+([A-Za-z_$][\w$]*)"),
+    re.compile(r"\btype\s+([A-Za-z_$][\w$]*)\s*(?:<[^=]*>)?\s*="),
+    # const foo = (a) =>  /  let foo = async x =>  /  var foo = function(  /  const foo: Fn = () =>
+    re.compile(
+        r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s+)?"
+        r"(?:function\b|\([^)]*\)\s*(?::[^=]+)?=>|[A-Za-z_$][\w$]*\s*=>)"
+    ),
+    # class members (no nested parens, so `setTimeout(function () {` isn't one):  async foo(a) {  /  static get bar() {  /  private baz(x: T): R {  /  qux = (e) => {
+    re.compile(
+        r"^\s*(?:(?:public|private|protected|static|readonly|abstract|override|async|get|set|declare)\s+)*"
+        r"#?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\([^;()]*\)\s*(?::\s*[^{;=]+)?\{"
+    ),
+    re.compile(
+        r"^\s*(?:(?:public|private|protected|static|readonly)\s+)*#?([A-Za-z_$][\w$]*)\s*="
+        r"\s*(?:async\s+)?\([^)]*\)\s*=>"
+    ),
+]
+
+_GO_PATTERNS = [
+    # func Name(  /  func (r *T) Name(  /  func Name[T any](
+    re.compile(r"\bfunc\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*[\[(]"),
+    re.compile(r"^\s*type\s+([A-Za-z_]\w*)\b"),
+]
+
+_JAVA_MODIFIERS = r"(?:public|protected|private|static|final|abstract|synchronized|native|default|strictfp)"
+_JVM_PATTERNS = [
+    re.compile(r"\b(?:class|interface|enum|record|object)\s+([A-Za-z_]\w*)"),
+    # Kotlin: fun name(  /  fun <T> List<T>.name(  /  suspend fun name(
+    re.compile(r"\bfun\s+(?:<[^>]*>\s*)?(?:[\w.<>?, ]+\.)?([A-Za-z_]\w*)\s*\("),
+    # Java methods: [annotations] [modifiers] [<T>] ReturnType name(...)  — not a statement (no trailing `;`)
+    re.compile(
+        rf"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:{_JAVA_MODIFIERS}\s+)*(?:<[^>]*>\s+)?"
+        r"([A-Za-z_][\w.$]*(?:<[^()]*>)?(?:\[\])*)\s+([A-Za-z_]\w*)\s*\([^;]*$"
+    ),
+    # Java constructors: modifiers are required so `foo(bar)` calls don't match
+    re.compile(rf"^\s*(?:{_JAVA_MODIFIERS}\s+)+([A-Z]\w*)\s*\([^;]*$"),
+]
+
+_PATTERNS_BY_EXT: dict[str, list[re.Pattern[str]]] = {
+    **dict.fromkeys((".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"), _JS_PATTERNS),
+    ".go": _GO_PATTERNS,
+    **dict.fromkeys((".java", ".kt", ".kts"), _JVM_PATTERNS),
+}
+
+
+def symbols_in_line(line: str, path: str) -> list[str]:
+    """Names a single source line defines, using patterns for the file's language (by extension)."""
+    patterns = _PATTERNS_BY_EXT.get(PurePosixPath(path).suffix.lower())
+    if patterns is None:
+        return SYMBOL_RE.findall(line)
+    out: list[str] = []
+    for pat in patterns:
+        for m in pat.finditer(line):
+            name = m.group(m.lastindex or 1)  # Java methods capture (return type, name)
+            if m.lastindex and m.lastindex > 1 and m.group(1) in _KEYWORDS:
+                continue  # `return foo(` / `new Foo(` / `throw err(`
+            if name not in _KEYWORDS and name not in out:
+                out.append(name)
+    return out
 
 
 def changed_symbols(diff: FileDiff) -> list[str]:
     """Symbols defined on added lines, plus enclosing definitions visible in the hunk
-    (context lines and the `@@ ... @@ def foo():` header) — so body-only edits still find callers."""
+    (context lines and the `@@ ... @@ def foo():` header) — so body-only edits still find callers.
+    JS/TS, Go and Java/Kotlin get language-aware patterns; other languages use `SYMBOL_RE`."""
     seen: dict[str, None] = {}
     for h in diff.hunks:
         if not h.added_lines:
             continue
-        candidates = [h.header.split("@@")[-1]] + [ln for ln in h.lines if not ln.startswith("-")]
+        candidates = [h.header.split("@@")[-1]] + [ln[1:] for ln in h.lines if not ln.startswith("-")]
         for line in candidates:
-            for name in SYMBOL_RE.findall(line):
+            for name in symbols_in_line(line, diff.path):
                 if len(name) >= 4 and not name.startswith("__"):
                     seen.setdefault(name, None)
     return list(seen)

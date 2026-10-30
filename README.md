@@ -86,9 +86,11 @@ Dropped files are never fetched and never count against the file budget. The num
 A diff alone isn't enough to judge a change, so each file gets:
 
 - The **whole file after the change** if it's short (≤ 400 lines), otherwise ±30-line windows around each hunk.
-- **Related snippets**: the code finds symbols defined or edited in the diff (`def`, `class`, `func`, …), searches
-  the repo for other files that use them, and includes those call sites. That's how the reviewer notices a
-  changed return type that breaks a caller in another file.
+- **Related snippets**: the code finds symbols defined or edited in the diff, searches the repo for other files
+  that use them, and includes those call sites. Detection is language-aware for JS/TS (`function`, arrow-function
+  `const`s, class methods, `export default function`), Go (`func (r *T) Name`, `type T struct`) and Java/Kotlin
+  (methods, constructors, `fun`, classes); other languages fall back to `def`/`class`/`fn`/… patterns. That's how
+  the reviewer notices a changed return type that breaks a caller in another file.
 - Optionally, **embedding retrieval** (`RETRIEVER=embedding`): the repo is split into 40-line chunks, each chunk
   and each changed file's hunks are embedded, and the closest chunks by cosine similarity are added, so code that
   does the same job under different names still shows up. The embedder is pluggable (any
@@ -508,7 +510,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] One-click GitHub ` ```suggestion ` blocks
 - [x] 👍/👎 feedback report: precision per agent
 - [x] Pluggable embedding retrieval
-- [ ] Better symbol detection for JS/TS, Go, Java/Kotlin
+- [x] Better symbol detection for JS/TS, Go, Java/Kotlin
 
 ---
 
