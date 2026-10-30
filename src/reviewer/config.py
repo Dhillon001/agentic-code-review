@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -40,6 +41,11 @@ class Settings(BaseSettings):
     full_file_max_lines: int = 400  # send whole file if shorter, else windows around hunks
     context_lines: int = 30
     max_related_per_file: int = 3
+    # How related snippets are found: `lexical` = call sites of changed symbols (default);
+    # `embedding` = repo chunks ranked by embedding similarity (see reviewer/context/embedding.py).
+    retriever: Literal["lexical", "embedding"] = "lexical"
+    embedding_chunk_lines: int = 40
+    embedding_max_files: int = 500  # files indexed per review when the source can list them
     max_prompt_chars: int = 120_000  # per specialist call; files are batched to fit
 
 

@@ -17,6 +17,10 @@ class Source(Protocol):
     async def search(self, symbol: str, limit: int = 5) -> list[str]: ...
 
 
+# Optional extra a source may implement: `async def list_files(self) -> list[str]` (every file at the
+# reviewed ref). The embedding retriever indexes those; without it, it falls back to search results.
+
+
 class GitHubSource:
     def __init__(self, client: GitHubClient, repo: str, ref: str):
         self.client, self.repo, self.ref = client, repo, ref
@@ -55,6 +59,10 @@ class LocalGitSource:
         paths = [p.removeprefix(prefix) for p in out.splitlines() if p]
         return paths[:limit]
 
+    async def list_files(self) -> list[str]:
+        out = await asyncio.to_thread(self._git, "ls-tree", "-r", "--name-only", self.head)
+        return [p for p in out.splitlines() if p]
+
 
 class InMemorySource:
     """Dict-backed source for tests and eval cases."""
@@ -68,3 +76,6 @@ class InMemorySource:
     async def search(self, symbol: str, limit: int = 5) -> list[str]:
         pat = re.compile(rf"\b{re.escape(symbol)}\b")
         return [p for p, c in self.files.items() if pat.search(c)][:limit]
+
+    async def list_files(self) -> list[str]:
+        return list(self.files)

@@ -89,6 +89,12 @@ A diff alone isn't enough to judge a change, so each file gets:
 - **Related snippets**: the code finds symbols defined or edited in the diff (`def`, `class`, `func`, …), searches
   the repo for other files that use them, and includes those call sites. That's how the reviewer notices a
   changed return type that breaks a caller in another file.
+- Optionally, **embedding retrieval** (`RETRIEVER=embedding`): the repo is split into 40-line chunks, each chunk
+  and each changed file's hunks are embedded, and the closest chunks by cosine similarity are added, so code that
+  does the same job under different names still shows up. The embedder is pluggable (any
+  `embed(texts) -> list[list[float]]`, passed as `EmbeddingRetriever(embed)` to `build_context`); the built-in
+  default is a dependency-free hashed bag-of-identifiers, so it works offline. Local runs index the whole repo
+  (up to `EMBEDDING_MAX_FILES`); on GitHub, code-search hits for the changed symbols are re-ranked instead.
 
 Files are then **greedy-packed into batches** that fit `MAX_PROMPT_CHARS`, so big PRs become several calls
 instead of one truncated one.
@@ -294,6 +300,9 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `FULL_FILE_MAX_LINES` | `400` | Send the whole file if it's shorter than this |
 | `CONTEXT_LINES` | `30` | Window size around hunks for longer files |
 | `MAX_RELATED_PER_FILE` | `3` | Related call-site snippets per file |
+| `RETRIEVER` | `lexical` | How related snippets are found: `lexical` (call sites) · `embedding` (similar chunks) |
+| `EMBEDDING_CHUNK_LINES` | `40` | Chunk size for embedding retrieval |
+| `EMBEDDING_MAX_FILES` | `500` | Max files indexed per review by embedding retrieval |
 | `MAX_PROMPT_CHARS` | `120000` | Prompt budget per specialist call (files are batched to fit) |
 
 ### Per-repo config (`.acr.yml`)
@@ -445,7 +454,8 @@ src/reviewer/
 │   ├── github.py        # async GitHub REST client
 │   └── sources.py       # GitHubSource · LocalGitSource · InMemorySource (read / search files)
 ├── context/
-│   └── retriever.py     # per-file context + related call sites (the seam for embedding RAG)
+│   ├── retriever.py     # per-file context · Retriever protocol · lexical call-site retriever
+│   └── embedding.py     # EmbeddingRetriever: chunk → embed (pluggable) → cosine top-k
 ├── agents/
 │   ├── prompts.py       # every word the models see + the tool schemas
 │   ├── specialists.py   # the four reviewers
@@ -496,8 +506,8 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] Token, cost, and latency tracking
 - [x] More eval cases
 - [x] One-click GitHub ` ```suggestion ` blocks
-- [ ] 👍/👎 feedback report: precision per agent
-- [ ] Pluggable embedding retrieval
+- [x] 👍/👎 feedback report: precision per agent
+- [x] Pluggable embedding retrieval
 - [ ] Better symbol detection for JS/TS, Go, Java/Kotlin
 
 ---

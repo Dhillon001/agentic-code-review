@@ -1,14 +1,16 @@
 """Context retrieval: give reviewers more than the raw diff.
 
-v0 = lexical: full changed file (or windows around hunks) + call sites of symbols defined/changed
-in the diff. The `find_related` function is the seam to swap in embedding-based RAG later
-(e.g. a pgvector index of repo chunks) without touching the agents.
+Every changed file gets its content (whole, or windows around hunks) plus related snippets from a
+`Retriever`. The default `LexicalRetriever` pulls call sites of symbols defined/changed in the diff;
+`EmbeddingRetriever` (see `embedding.py`) ranks repo chunks by embedding similarity. Pick one with the
+`retriever: lexical|embedding` setting, or pass any object with a matching `related()` to `build_context`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import re
+from typing import Protocol
 
 from reviewer.config import Settings
 from reviewer.ingest.sources import Source
@@ -63,7 +65,30 @@ async def find_related(source: Source, diff: FileDiff, settings: Settings) -> li
     return out
 
 
-async def build_context(source: Source, diffs: list[FileDiff], settings: Settings) -> list[FileContext]:
+class Retriever(Protocol):
+    async def related(self, source: Source, diff: FileDiff, settings: Settings) -> list[RelatedSnippet]: ...
+
+
+class LexicalRetriever:
+    """Call sites of the changed symbols, found by code search. Cheap, precise, no model needed."""
+
+    async def related(self, source: Source, diff: FileDiff, settings: Settings) -> list[RelatedSnippet]:
+        return await find_related(source, diff, settings)
+
+
+def make_retriever(settings: Settings) -> Retriever:
+    if settings.retriever == "embedding":
+        from reviewer.context.embedding import EmbeddingRetriever  # imports this module
+
+        return EmbeddingRetriever(chunk_lines=settings.embedding_chunk_lines, max_files=settings.embedding_max_files)
+    return LexicalRetriever()
+
+
+async def build_context(
+    source: Source, diffs: list[FileDiff], settings: Settings, retriever: Retriever | None = None
+) -> list[FileContext]:
+    """`retriever` defaults to the one `settings.retriever` names; inject one to use a custom embedder."""
+    retriever = retriever or make_retriever(settings)
     sem = asyncio.Semaphore(8)
 
     async def one(d: FileDiff) -> FileContext:
@@ -71,7 +96,7 @@ async def build_context(source: Source, diffs: list[FileDiff], settings: Setting
             return FileContext(diff=d)
         async with sem:
             content = await source.read_file(d.path)
-            related = await find_related(source, d, settings)
+            related = await retriever.related(source, d, settings)
         return FileContext(diff=d, content=content, related=related)
 
     return list(await asyncio.gather(*(one(d) for d in diffs[: settings.max_files])))
