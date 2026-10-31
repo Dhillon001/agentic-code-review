@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import logging
 
+from reviewer import __version__
 from reviewer.config import get_settings
 from reviewer.feedback import format_report
 from reviewer.models import ReviewResult
@@ -39,6 +40,7 @@ def print_result(result: ReviewResult) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(prog="acr", description="Agentic code review")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pr = sub.add_parser("pr", help="review a GitHub pull request")

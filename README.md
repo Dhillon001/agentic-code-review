@@ -7,18 +7,20 @@
 Four specialist AI reviewers read your PR in parallel. A stronger **verifier** model re-checks every finding
 against the real code. Only what survives gets posted.
 
+[![Release](https://img.shields.io/badge/release-v0.1.0-0ea5e9)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-offline%20%C2%B7%20no%20API%20key-8b5cf6)](tests/)
+[![Tests](https://img.shields.io/badge/tests-214%20passing%20%C2%B7%20offline-8b5cf6)](tests/)
 [![Claude](https://img.shields.io/badge/powered%20by-Claude-d97757)](https://www.anthropic.com/claude)
-[![Roadmap](https://img.shields.io/badge/roadmap-v0.1.0-f59e0b)](ROADMAP.md)
 
 [How it works](#how-it-works) ·
+[Features](#features) ·
 [Quickstart](#quickstart) ·
 [Configuration](#configuration) ·
 [Deploy](#deploy) ·
 [Evals](#evals) ·
-[Architecture](#layout)
+[Architecture](#layout) ·
+[Changelog](CHANGELOG.md)
 
 <br/>
 
@@ -44,6 +46,28 @@ This project makes the opposite bet — **precision over volume**:
 | Unbounded comment count | Severity floor + **hard cap** per PR |
 | Reviews lockfiles and minified bundles | **Noise files skipped** before a single token is spent |
 | "Trust me, it's good" | A built-in **eval harness** measures precision and recall |
+
+---
+
+<a id="features"></a>
+
+## ✨ Features (v0.1.0)
+
+- **Four parallel specialists** — correctness, security, performance, tests — with forced tool-use output.
+- **Verifier pass** on a stronger model; anything it doesn't confirm is dropped (and kept for tuning).
+- **Lands on real diff lines** — findings are snapped to commentable lines; severity floor and hard cap per PR.
+- **One-click fixes** — single-line fixes post as GitHub ` ```suggestion ` blocks.
+- **Per-repo `.acr.yml`** — ignores, severity floor, comment cap, and free-text team rules.
+- **Skips noise** — lockfiles, minified/generated code, vendored dirs, and binaries never cost a token.
+- **Incremental re-reviews** — only new commits are reviewed, and the bot never repeats a comment.
+- **Cheap to run** — shared PR context is prompt-cached across specialists; every review reports tokens,
+  estimated cost, and latency.
+- **Smarter context** — call sites of changed symbols (Python, JS/TS, Go, Java/Kotlin, …) plus optional
+  pluggable embedding retrieval.
+- **Measurable** — a labelled eval suite for precision/recall, and `acr feedback` for 👍/👎 precision in the wild.
+- **Runs anywhere** — CLI, GitHub Action, or a Dockerised webhook service.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release notes.
 
 ---
 
@@ -227,6 +251,7 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr feedback owner/repo --days 30` | How useful were the bot's comments? 👍/👎 precision per agent and category |
 | `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
 | `acr -v ...` | Verbose logging |
+| `acr --version` | Print the installed version |
 
 Every run ends with a stats line showing the whole funnel, and a usage line showing what it cost:
 
@@ -499,7 +524,8 @@ deploy/                  # GitHub Action workflow
 
 ## 🗺️ Roadmap
 
-Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](ROADMAP.md).
+**v0.1.0 is released** — one tested feature per commit. Full detail in [ROADMAP.md](ROADMAP.md); release notes
+in [CHANGELOG.md](CHANGELOG.md).
 
 - [x] Per-repo config (`.acr.yml`)
 - [x] Skip noise files
@@ -511,6 +537,7 @@ Toward **v0.1.0**, one tested feature per commit. Full detail in [ROADMAP.md](RO
 - [x] 👍/👎 feedback report: precision per agent
 - [x] Pluggable embedding retrieval
 - [x] Better symbol detection for JS/TS, Go, Java/Kotlin
+- [x] Release v0.1.0
 
 ---
 

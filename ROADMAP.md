@@ -49,5 +49,5 @@ and keeps `pytest -q` green. Tick the box in the same commit that implements the
 
 ## Sat Oct 31
 
-- [ ] **Release v0.1.0.** Add `CHANGELOG.md` summarising everything above, bump version to 0.1.0 if needed,
+- [x] **Release v0.1.0.** Add `CHANGELOG.md` summarising everything above, bump version to 0.1.0 if needed,
   add README badges (Python version, license, tests), refresh README feature list, and create tag `v0.1.0`.
