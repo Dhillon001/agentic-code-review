@@ -524,7 +524,7 @@ deploy/                  # GitHub Action workflow
 
 ## 🗺️ Roadmap
 
-**v0.1.0 is released** — one tested feature per commit. Full detail in [ROADMAP.md](ROADMAP.md); release notes
+**v0.1.0 is released; v0.2.0 (CI gating, SARIF, secret scanning, budgets, eval tooling) is in progress** — one tested feature per commit. Full detail in [ROADMAP.md](ROADMAP.md); release notes
 in [CHANGELOG.md](CHANGELOG.md).
 
 - [x] Per-repo config (`.acr.yml`)

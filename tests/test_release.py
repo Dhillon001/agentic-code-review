@@ -28,7 +28,8 @@ def test_changelog_has_entry_for_current_version():
     changelog = (ROOT / "CHANGELOG.md").read_text()
     headings = re.findall(r"^## \[([^\]]+)\]", changelog, re.MULTILINE)
     assert headings, "CHANGELOG.md has no version headings"
-    assert headings[0] == __version__, "latest CHANGELOG entry should be the current version"
+    released = [h for h in headings if h.lower() != "unreleased"]
+    assert released[0] == __version__, "latest released CHANGELOG entry should be the current version"
     assert f"[{__version__}]: " in changelog, "missing link reference for the current version"
 
 
