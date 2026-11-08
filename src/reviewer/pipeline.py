@@ -18,6 +18,7 @@ from reviewer.agents.verifier import verify
 from reviewer.config import Settings
 from reviewer.models import FileContext, Finding, PRContext, ReviewResult
 from reviewer.ranking import dedupe, place, rank
+from reviewer.suppress import split_suppressed, suppressions_for
 from reviewer.usage import recording, summarize
 
 log = logging.getLogger(__name__)
@@ -106,6 +107,9 @@ async def _review(
     repeats = [f for f in candidates if (f.file, f.line) in seen]
     candidates = [f for f in candidates if (f.file, f.line) not in seen]
     files_by_path = {fc.path: fc for fc in reviewable}
+    # `acr: ignore` comments: drop before verifying (no point paying to confirm a silenced finding)
+    suppressions = suppressions_for(reviewable)
+    candidates, suppressed = split_suppressed(candidates, suppressions)
 
     if settings.verify and candidates:
         confirmed, rejected = await verify(llm, candidates, files_by_path, settings)
@@ -116,6 +120,8 @@ async def _review(
     inline, summary_only = place(ranked, files_by_path)
     snapped_repeats = [f for f in inline if (f.file, f.line) in seen]  # snapped onto an old comment
     inline = [f for f in inline if (f.file, f.line) not in seen]
+    # ...and again after snapping, in case a finding was moved onto a suppressed line
+    inline, snapped_suppressed = split_suppressed(inline, suppressions)
 
     return ReviewResult(
         inline=inline,
@@ -132,6 +138,7 @@ async def _review(
             "candidates": len(candidates),
             "confirmed": len(confirmed),
             "rejected": len(rejected),
+            "suppressed": len(suppressed) + len(snapped_suppressed),
             "posted": len(inline) + len(summary_only),
         },
     )

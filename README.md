@@ -269,6 +269,7 @@ usage: 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s
 | `batches` · `agent_calls` · `agent_errors` | How the work was split, and how many model calls failed (failures never sink the review) |
 | `raw_findings` → `candidates` → `confirmed` | The funnel: everything the agents said → after confidence floor + dedupe → after the verifier |
 | `already_commented` | Findings dropped because the bot already commented on that exact line in an earlier review |
+| `suppressed` | Findings silenced by an `acr: ignore` comment in the code (see below) |
 | `rejected` · `posted` | Killed by the verifier · actually posted after ranking and the cap |
 
 #### 💸 Usage: tokens, cost, latency
@@ -332,6 +333,22 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `EMBEDDING_CHUNK_LINES` | `40` | Chunk size for embedding retrieval |
 | `EMBEDDING_MAX_FILES` | `500` | Max files indexed per review by embedding retrieval |
 | `MAX_PROMPT_CHARS` | `120000` | Prompt budget per specialist call (files are batched to fit) |
+
+### Inline suppressions (`acr: ignore`)
+
+Silence a finding right where it lives, in any comment syntax:
+
+```python
+legacy_query(sql)       # acr: ignore                    ← nothing on this line
+token = os.environ[k]   # acr: ignore[security]          ← only the security agent / category
+# acr: ignore-next-line[performance, n-plus-one]
+for u in users: db.load(u)                              ← next line, only those
+```
+
+A scope token matches an agent name (`security`) or a finding category (`sql-injection`), case-insensitively.
+Suppressed findings are dropped **before** the verifier (so they cost nothing to check) and counted as
+`suppressed` in the stats. Suppressions are read from the changed file, so they show up in the PR diff for
+reviewers to see.
 
 ### Per-repo config (`.acr.yml`)
 

@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format follows
 - **CI gate** — `acr pr|local --fail-on {low,medium,high,critical}` exits 1 when any posted finding is at or
   above that severity, 2 when the review itself fails (bad config, missing key, API error), and 0 otherwise.
   Verifier-rejected findings never fail a build.
+- **Inline suppressions** — `acr: ignore` (same line), `acr: ignore-next-line`, and scoped
+  `acr: ignore[security, n-plus-one]` comments in any language silence matching findings. Scopes match an agent
+  name or category. Suppressed findings skip the verifier and are counted as `suppressed` in stats.
 
 ## [0.1.0] — 2026-10-31
 
