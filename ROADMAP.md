@@ -8,7 +8,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Sat Nov 7
 
-- [ ] **CI gate (`--fail-on`).** `acr pr|local --fail-on {low,medium,high,critical}` exits 1 when any posted
+- [x] **CI gate (`--fail-on`).** `acr pr|local --fail-on {low,medium,high,critical}` exits 1 when any posted
   finding is at or above that severity (exit 2 on internal error, 0 otherwise). Document in README for CI use.
 - [ ] **Inline suppressions.** A line containing `acr: ignore` (any comment syntax), or the line after one
   containing `acr: ignore-next-line`, suppresses findings on it; `acr: ignore[security]` scopes to a category.

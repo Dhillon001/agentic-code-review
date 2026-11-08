@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **CI gate** — `acr pr|local --fail-on {low,medium,high,critical}` exits 1 when any posted finding is at or
+  above that severity, 2 when the review itself fails (bad config, missing key, API error), and 0 otherwise.
+  Verifier-rejected findings never fail a build.
+
 ## [0.1.0] — 2026-10-31
 
 First release: a multi-agent pull-request reviewer where four specialists review in parallel and a stronger

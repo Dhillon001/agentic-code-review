@@ -249,6 +249,7 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr pr owner/repo 123 --post` | …and post it as a real PR review |
 | `acr pr owner/repo 123 --since <sha>` | Incremental: only review hunks changed since `<sha>` |
 | `acr feedback owner/repo --days 30` | How useful were the bot's comments? 👍/👎 precision per agent and category |
+| `acr local --fail-on high` | CI gate: exit **1** if any posted finding is `high` or worse, **2** if the review itself fails, **0** otherwise (also on `acr pr`) |
 | `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
 | `acr -v ...` | Verbose logging |
 | `acr --version` | Print the installed version |
@@ -396,6 +397,9 @@ Reviews every PR automatically. No server needed.
 
 For **another** repo, copy the workflow and change `pip install .` to
 `pip install git+https://github.com/Dhillon001/agentic-code-review`.
+
+To **block merges** on serious findings, add `--fail-on high` to the `acr pr` step and make the check
+required. Exit code 2 (review crashed) is distinct from 1 (real findings), so you can tell them apart.
 
 Draft PRs are skipped. On a push, only the new commits are reviewed. A new push cancels the review
 that's still running.
