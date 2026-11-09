@@ -1,11 +1,13 @@
 """
-acr pr owner/repo 123 [--post] [--since SHA] [--json]
+acr pr owner/repo 123 [--post] [--since SHA]
                                             review a GitHub PR (optionally post; --since = only new commits)
 acr local [--repo .] [--base main]          review your current branch against a base
 acr feedback owner/repo [--days 30]         👍/👎 precision of the bot's comments, per agent and category
 
 `pr` and `local` accept `--fail-on SEVERITY` for CI: exit 1 if any posted finding is at or above it,
-exit 2 if the review itself fails, 0 otherwise (see reviewer/gate.py).
+exit 2 if the review itself fails, 0 otherwise (see reviewer/gate.py). They also accept
+`--format {text,json,markdown}` (`--json` is an alias for `--format json`) and `--out PATH` to write the
+report to a file instead of stdout.
 """
 
 from __future__ import annotations
@@ -21,25 +23,49 @@ from reviewer.feedback import format_report
 from reviewer.gate import EXIT_ERROR, EXIT_OK, SEVERITY_CHOICES, gate_exit_code, gate_message
 from reviewer.models import ReviewResult
 from reviewer.output.github_review import ICON
+from reviewer.output.markdown import format_markdown
 from reviewer.service import feedback_report, review_github_pr, review_local
 from reviewer.usage import format_usage
 
 
-def print_result(result: ReviewResult) -> None:
+FORMATS = ["text", "json", "markdown"]
+
+
+def format_text(result: ReviewResult) -> str:
+    lines: list[str] = []
     findings = result.inline + result.summary_only
     if not findings:
-        print("✅ No issues survived verification.")
+        lines.append("✅ No issues survived verification.")
     for f in findings:
-        print(f"{ICON[f.severity.value]} [{f.severity.value}] {f.file}:{f.line}  ({f.agent}/{f.category})")
-        print(f"   {f.title}")
-        print(f"   {f.detail}")
+        lines.append(f"{ICON[f.severity.value]} [{f.severity.value}] {f.file}:{f.line}  ({f.agent}/{f.category})")
+        lines.append(f"   {f.title}")
+        lines.append(f"   {f.detail}")
         if f.suggestion:
-            print(f"   fix: {f.suggestion}")
+            lines.append(f"   fix: {f.suggestion}")
         if f.single_line_replacement is not None:
-            print(f"   replace line {f.line} with: {f.single_line_replacement}")
-        print()
-    print("stats:", result.stats)
-    print("usage:", format_usage(result.usage))
+            lines.append(f"   replace line {f.line} with: {f.single_line_replacement}")
+        lines.append("")
+    lines.append(f"stats: {result.stats}")
+    lines.append(f"usage: {format_usage(result.usage)}")
+    return "\n".join(lines) + "\n"
+
+
+def print_result(result: ReviewResult) -> None:
+    print(format_text(result), end="")
+
+
+def render(result: ReviewResult, fmt: str) -> str:
+    if fmt == "json":
+        return result.model_dump_json(indent=2) + "\n"
+    if fmt == "markdown":
+        return format_markdown(result)
+    return format_text(result)
+
+
+def _add_output(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--format", choices=FORMATS, default=None, help="report format (default: text)")
+    parser.add_argument("--json", action="store_true", help="alias for --format json")
+    parser.add_argument("--out", metavar="PATH", help="write the report to PATH instead of stdout")
 
 
 def _add_fail_on(parser: argparse.ArgumentParser) -> None:
@@ -67,14 +93,14 @@ def run(argv: list[str] | None = None) -> int:
     pr.add_argument("number", type=int)
     pr.add_argument("--post", action="store_true", help="post the review to GitHub")
     pr.add_argument("--since", metavar="SHA", help="only review hunks changed since this commit")
-    pr.add_argument("--json", action="store_true")
+    _add_output(pr)
     _add_fail_on(pr)
 
     lo = sub.add_parser("local", help="review a local branch")
     lo.add_argument("--repo", default=".")
     lo.add_argument("--base", default="main")
     lo.add_argument("--head", default="HEAD")
-    lo.add_argument("--json", action="store_true")
+    _add_output(lo)
     _add_fail_on(lo)
 
     fb = sub.add_parser("feedback", help="precision of posted comments from 👍/👎 reactions")
@@ -84,6 +110,12 @@ def run(argv: list[str] | None = None) -> int:
 
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
+
+    if args.cmd in ("pr", "local"):
+        if args.json and args.format not in (None, "json"):
+            p.error(f"--json conflicts with --format {args.format}")
+        args.format = "json" if args.json else (args.format or "text")
+
     settings = get_settings()
 
     if args.cmd == "feedback":
@@ -109,10 +141,16 @@ def run(argv: list[str] | None = None) -> int:
         print(f"acr: review failed: {type(e).__name__}: {e}", file=sys.stderr)
         return EXIT_ERROR
 
-    if args.json:
-        print(result.model_dump_json(indent=2))
+    report = render(result, args.format)
+    if args.out:
+        try:
+            with open(args.out, "w", encoding="utf-8") as fh:
+                fh.write(report)
+        except OSError as e:
+            print(f"acr: cannot write report to {args.out}: {e}", file=sys.stderr)
+            return EXIT_ERROR
     else:
-        print_result(result)
+        sys.stdout.write(report)
 
     message = gate_message(result, args.fail_on)
     if message:

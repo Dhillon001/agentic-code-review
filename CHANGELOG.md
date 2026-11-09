@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format follows
 - **Inline suppressions** — `acr: ignore` (same line), `acr: ignore-next-line`, and scoped
   `acr: ignore[security, n-plus-one]` comments in any language silence matching findings. Scopes match an agent
   name or category. Suppressed findings skip the verifier and are counted as `suppressed` in stats.
+- **Markdown report** — `acr pr|local --format {text,json,markdown}` (`--json` kept as an alias) and
+  `--out PATH`. Markdown groups findings by file (most severe first) with severity icons, `suggestion` blocks,
+  off-diff markers, and the funnel/usage footer — handy for `$GITHUB_STEP_SUMMARY`.
 
 ## [0.1.0] — 2026-10-31
 
