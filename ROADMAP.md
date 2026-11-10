@@ -23,7 +23,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Mon Nov 9
 
-- [ ] **Secret scanning pre-pass.** Deterministic regex detectors (AWS access keys, GitHub/Slack/Stripe tokens,
+- [x] **Secret scanning pre-pass.** Deterministic regex detectors (AWS access keys, GitHub/Slack/Stripe tokens,
   private key headers, generic `password=`/`api_key=` assignments with high-entropy values) on added lines only.
   Emits `critical` `secrets` findings with `confidence=1.0` that skip the verifier; values are redacted in output.
 

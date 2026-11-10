@@ -80,6 +80,8 @@ flowchart TD
     A([📥 PR or local branch]) --> B[1 · Ingest<br/>parse diff · drop noise & ignored files]
     B --> C[2 · Context<br/>changed file + callers of changed symbols]
     C --> D{{3 · Specialists in parallel<br/>one call per agent per batch}}
+    C --> K[🔑 secret pre-pass<br/>regex on added lines]
+    K -->|critical · skips verifier| G
     D --> S1[🧠 correctness]
     D --> S2[🔒 security]
     D --> S3[⚡ performance]
@@ -158,6 +160,16 @@ batch where the context dominates the prompt, that cuts specialist input cost by
 trims time-to-first-token. To make sure the cache exists before the others ask for it, one specialist runs
 first and the rest follow in parallel (`CACHE_WARMUP=false` trades that small latency hit for full
 parallelism). Prompts under the model's minimum cacheable length simply aren't cached; nothing breaks.
+
+#### 🔑 Secret scanning pre-pass
+
+Before any model call, every **added** line is checked by deterministic detectors: AWS access key IDs, GitHub
+tokens (`ghp_…`, `github_pat_…`), Slack tokens and webhook URLs, Stripe keys, private-key headers, and generic
+`password=` / `api_key:` / `secret=` / `token=` assignments whose literal value is long and high-entropy
+(placeholders like `${VAR}`, `<API_KEY>` or `changeme` are ignored). A hit becomes a **`critical`** finding in the
+`secrets` category with confidence 1.0 that **skips the verifier** — a key format isn't a judgement call. The
+value is redacted everywhere it would be shown (`AKIA****************`), including in any agent finding that
+quotes it. Silence a known-safe line with `acr: ignore[secrets]`, or turn the pass off with `SECRET_SCAN=false`.
 
 ### Stage 4 — Verifier 🕵️
 
@@ -271,6 +283,7 @@ usage: 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s
 | `batches` · `agent_calls` · `agent_errors` | How the work was split, and how many model calls failed (failures never sink the review) |
 | `raw_findings` → `candidates` → `confirmed` | The funnel: everything the agents said → after confidence floor + dedupe → after the verifier |
 | `already_commented` | Findings dropped because the bot already commented on that exact line in an earlier review |
+| `secrets` | Hardcoded credentials found by the regex pre-pass (posted as `critical`, never sent to the verifier) |
 | `suppressed` | Findings silenced by an `acr: ignore` comment in the code (see below) |
 | `rejected` · `posted` | Killed by the verifier · actually posted after ranking and the cap |
 
@@ -323,6 +336,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
 | `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
 | `VERIFY` | `true` | Turn the verifier off (useful for evals) |
+| `SECRET_SCAN` | `true` | Regex pre-pass for hardcoded credentials on added lines |
 | `MIN_CONFIDENCE` | `0.5` | Drop agent findings below this before verification |
 | `MIN_SEVERITY` | `medium` | `low` · `medium` · `high` · `critical` |
 | `MAX_COMMENTS` | `10` | Hard cap on comments per PR |
@@ -529,6 +543,8 @@ src/reviewer/
 │   └── llm.py           # LLM protocol + Anthropic implementation
 ├── pipeline.py          # orchestration: batch → fan out → dedupe → verify → rank → place
 ├── ranking.py           # dedupe · severity/cap ranking · snap-to-diff-line
+├── secret_scan.py       # regex credential detectors on added lines · redaction
+├── suppress.py          # `acr: ignore` directives
 ├── repo_config.py       # .acr.yml loading, merging, and glob matching
 ├── usage.py             # per-call token/latency records, price table, cost estimate, usage footer
 ├── feedback.py          # 👍/👎 reactions on posted comments → precision per agent / category

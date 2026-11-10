@@ -1,4 +1,4 @@
-"""Orchestration: fan out specialists x file-batches in parallel -> dedupe -> verify -> rank -> place."""
+"""Orchestration: secret pre-pass + specialists x file-batches in parallel -> dedupe -> verify -> rank -> place."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from reviewer.agents.verifier import verify
 from reviewer.config import Settings
 from reviewer.models import FileContext, Finding, PRContext, ReviewResult
 from reviewer.ranking import dedupe, place, rank
+from reviewer.secret_scan import scan as scan_secrets
+from reviewer.secret_scan import scrub
 from reviewer.suppress import split_suppressed, suppressions_for
 from reviewer.usage import recording, summarize
 
@@ -89,6 +91,10 @@ async def _review(
     if not reviewable:
         return ReviewResult(stats={"files": 0, "skipped": len(pr.skipped)})
 
+    # deterministic pre-pass: no model call, and its hits skip the verifier
+    secrets, secret_values = scan_secrets(reviewable) if settings.secret_scan else ([], set())
+    deterministic = {id(f) for f in secrets}
+
     batches = batch_files(reviewable, settings)
     per_batch = await asyncio.gather(*(_review_batch(llm, specialists, pr, b, settings) for b in batches))
     results = [r for batch_results in per_batch for r in batch_results]
@@ -102,7 +108,8 @@ async def _review(
         else:
             raw.extend(r)
 
-    candidates = dedupe([f for f in raw if f.confidence >= settings.min_confidence])
+    # secrets go first so they win ties in dedupe (an agent flagging the same line is a duplicate)
+    candidates = dedupe([f for f in [*secrets, *raw] if f.confidence >= settings.min_confidence])
     seen = already_commented or set()
     repeats = [f for f in candidates if (f.file, f.line) in seen]
     candidates = [f for f in candidates if (f.file, f.line) not in seen]
@@ -111,10 +118,12 @@ async def _review(
     suppressions = suppressions_for(reviewable)
     candidates, suppressed = split_suppressed(candidates, suppressions)
 
-    if settings.verify and candidates:
-        confirmed, rejected = await verify(llm, candidates, files_by_path, settings)
+    to_verify = [f for f in candidates if id(f) not in deterministic]
+    if settings.verify and to_verify:
+        confirmed, rejected = await verify(llm, to_verify, files_by_path, settings)
     else:
-        confirmed, rejected = candidates, []
+        confirmed, rejected = to_verify, []
+    confirmed = [f for f in candidates if id(f) in deterministic] + confirmed
 
     ranked = rank(confirmed, settings.min_severity, settings.max_comments)
     inline, summary_only = place(ranked, files_by_path)
@@ -124,15 +133,16 @@ async def _review(
     inline, snapped_suppressed = split_suppressed(inline, suppressions)
 
     return ReviewResult(
-        inline=inline,
-        summary_only=summary_only,
-        rejected=rejected,
+        inline=scrub(inline, secret_values),
+        summary_only=scrub(summary_only, secret_values),
+        rejected=scrub(rejected, secret_values),
         stats={
             "files": len(reviewable),
             "skipped": len(pr.skipped),
             "batches": len(batches),
             "agent_calls": len(results),
             "agent_errors": errors,
+            "secrets": len(secrets),
             "raw_findings": len(raw),
             "already_commented": len(repeats) + len(snapped_repeats),
             "candidates": len(candidates),

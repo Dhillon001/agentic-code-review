@@ -19,6 +19,10 @@ All notable changes to this project are documented here. The format follows
 - **SARIF output** — `--format sarif` emits SARIF 2.1.0 for `github/codeql-action/upload-sarif`: one rule per
   category (security categories tagged with `security-severity`), `error`/`warning`/`note` levels from severity,
   repo-relative locations, line-independent partial fingerprints, and single-line replacements as SARIF fixes.
+- **Secret scanning pre-pass** — deterministic detectors for AWS access keys, GitHub/Slack/Stripe tokens, Slack
+  webhooks, private-key headers, and high-entropy `password=`/`api_key=`-style assignments run on added lines
+  before any model call. Hits are `critical` `secrets` findings (confidence 1.0) that skip the verifier; values
+  are redacted in all output, including agent findings that quote them. `SECRET_SCAN=false` disables it.
 
 ## [0.1.0] — 2026-10-31
 

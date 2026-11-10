@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # Pipeline behaviour
     verify: bool = True
+    secret_scan: bool = True  # regex pre-pass for credentials on added lines (critical, skips the verifier)
     min_confidence: float = 0.5  # drop raw findings below this before verification
     min_severity: str = "medium"  # low | medium | high | critical
     max_comments: int = 10  # hard cap on comments posted per PR
