@@ -11,6 +11,7 @@ from reviewer.agents.prompts import VERDICTS_TOOL, VERIFIER_SYSTEM, with_team_ru
 from reviewer.config import Settings
 from reviewer.context.retriever import render_file_excerpt
 from reviewer.models import FileContext, Finding, Severity
+from reviewer.repo_config import rules_for_paths
 
 
 async def _verify_file(
@@ -34,7 +35,7 @@ async def _verify_file(
     )
     data = await llm.call_tool(
         model=settings.verifier_model,
-        system=with_team_rules(VERIFIER_SYSTEM, settings.rules),
+        system=with_team_rules(VERIFIER_SYSTEM, rules_for_paths(settings.rules, settings.path_rules, [fc.path])),
         user=user,
         tool=VERDICTS_TOOL,
     )

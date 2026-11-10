@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     max_comments: int = 10  # hard cap on comments posted per PR
     ignore: list[str] = Field(default_factory=list)  # path globs never reviewed (.acr.yml extends)
     rules: str = ""  # team conventions injected into reviewer prompts (usually from .acr.yml)
+    # glob -> extra conventions, injected only into prompts whose batch/file matches (usually from .acr.yml `paths:`)
+    path_rules: dict[str, str] = Field(default_factory=dict)
 
     # Context building
     max_files: int = 50

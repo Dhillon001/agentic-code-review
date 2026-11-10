@@ -23,6 +23,10 @@ All notable changes to this project are documented here. The format follows
   webhooks, private-key headers, and high-entropy `password=`/`api_key=`-style assignments run on added lines
   before any model call. Hits are `critical` `secrets` findings (confidence 1.0) that skip the verifier; values
   are redacted in all output, including agent findings that quote them. `SECRET_SCAN=false` disables it.
+- **Per-path rules** — `.acr.yml` `paths:` (or the `PATH_RULES` setting) maps globs to extra team rules, e.g.
+  `"src/api/**": Validate input with pydantic`. Rules reach only the prompts of batches containing a matching
+  file (and that file's verifier call), so unrelated code isn't judged against them; per-batch system prompts
+  stay byte-identical across specialists, so prompt caching still hits.
 
 ## [0.1.0] — 2026-10-31
 

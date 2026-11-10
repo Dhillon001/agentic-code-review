@@ -10,6 +10,7 @@ from reviewer.agents.prompts import COMMON_RULES, FINDINGS_TOOL, SPECIALIST_FOCU
 from reviewer.config import Settings
 from reviewer.context.retriever import render_file_excerpt
 from reviewer.models import FileContext, Finding, PRContext
+from reviewer.repo_config import rules_for_paths
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ class Specialist:
 
 
 def reviewer_system(rules: str = "") -> str:
-    """System prompt shared by every specialist. Must not vary per specialist, or the cache misses."""
+    """System prompt shared by every specialist. Must not vary per specialist, or the cache misses.
+    (It may vary per batch: `paths:` rules are only included for batches containing matching files.)"""
     return with_team_rules(COMMON_RULES, rules)
 
 
@@ -76,7 +78,7 @@ async def run_specialist(
         shared_context = build_review_prompt(pr, files, settings)
     data = await llm.call_tool(
         model=settings.reviewer_model,
-        system=reviewer_system(settings.rules),
+        system=reviewer_system(rules_for_paths(settings.rules, settings.path_rules, [fc.path for fc in files])),
         user=build_specialist_content(spec, shared_context),
         tool=FINDINGS_TOOL,
     )

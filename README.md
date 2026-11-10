@@ -57,7 +57,7 @@ This project makes the opposite bet — **precision over volume**:
 - **Verifier pass** on a stronger model; anything it doesn't confirm is dropped (and kept for tuning).
 - **Lands on real diff lines** — findings are snapped to commentable lines; severity floor and hard cap per PR.
 - **One-click fixes** — single-line fixes post as GitHub ` ```suggestion ` blocks.
-- **Per-repo `.acr.yml`** — ignores, severity floor, comment cap, and free-text team rules.
+- **Per-repo `.acr.yml`** — ignores, severity floor, comment cap, free-text team rules, and per-path rules.
 - **Skips noise** — lockfiles, minified/generated code, vendored dirs, and binaries never cost a token.
 - **Incremental re-reviews** — only new commits are reviewed, and the bot never repeats a comment.
 - **Cheap to run** — shared PR context is prompt-cached across specialists; every review reports tokens,
@@ -341,6 +341,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `MIN_SEVERITY` | `medium` | `low` · `medium` · `high` · `critical` |
 | `MAX_COMMENTS` | `10` | Hard cap on comments per PR |
 | `IGNORE` | `[]` | Extra path globs never reviewed (JSON list) |
+| `PATH_RULES` | `{}` | Glob → extra rules for matching files only (JSON object; `.acr.yml` `paths:` overrides per glob) |
 | `MAX_FILES` | `50` | Max files reviewed per PR |
 | `FULL_FILE_MAX_LINES` | `400` | Send the whole file if it's shorter than this |
 | `CONTEXT_LINES` | `30` | Window size around hunks for longer files |
@@ -380,7 +381,11 @@ min_severity: high   # low | medium | high | critical
 max_comments: 5      # cap on comments per PR
 rules: |             # team conventions, added to every reviewer's and the verifier's prompt
   - All DB access goes through the repository layer; no raw SQL in request handlers.
-  - Public functions in api/ validate input with pydantic models.
+paths:               # extra rules only for files matching a glob (same glob syntax as `ignore`)
+  "src/api/**": Validate input with pydantic models.
+  "*.sql":
+    - Every migration is reversible.
+    - No SELECT *.
 ```
 
 <details>
@@ -390,6 +395,9 @@ rules: |             # team conventions, added to every reviewer's and the verif
   `acr local` is trusted and reads it from the head ref, so you can try changes by committing them.
 - `rules` may also be a YAML list of strings. Violations are reported with category `team-rule`. Rules are
   capped at 4,000 characters so they can't eat the prompt budget.
+- `paths` rules are injected only into the prompts of file batches that contain a matching file (and into the
+  verifier's prompt for that file), labelled with the files they apply to. Each value is a string or list,
+  capped like `rules`; at most 50 globs are used. Repo entries override a `PATH_RULES` entry with the same glob.
 - **A bad config never blocks a review:** invalid YAML is ignored, and invalid fields fall back to defaults.
 
 </details>

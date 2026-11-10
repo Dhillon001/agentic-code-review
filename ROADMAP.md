@@ -29,7 +29,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Tue Nov 10
 
-- [ ] **Per-path rules.** `.acr.yml` `paths:` maps globs to extra rules (`"src/api/**": "Validate input with
+- [x] **Per-path rules.** `.acr.yml` `paths:` maps globs to extra rules (`"src/api/**": "Validate input with
   pydantic"`); rules are injected only into prompts for batches containing matching files.
 - [ ] **Custom specialists.** `.acr.yml` `agents:` adds reviewers (`name`, `focus`, optional `severity_floor`)
   and `disable: [performance]` turns built-ins off. Validate names; unknown disables are ignored with a warning.

@@ -6,7 +6,9 @@
     max_comments: 5
     rules: |
       - All DB access goes through the repository layer, never raw SQL in handlers.
-      - Public functions in `api/` must validate input with pydantic models.
+    paths:                       # extra rules only for batches/files matching the glob
+      "src/api/**": Validate input with pydantic models.
+      "*.sql": [Every migration is reversible, No SELECT *]
 
 A broken file never breaks a review: bad YAML is ignored and bad fields fall back to defaults.
 """
@@ -27,6 +29,18 @@ log = logging.getLogger(__name__)
 
 CONFIG_PATH = ".acr.yml"
 MAX_RULES_CHARS = 4000  # keep a runaway rules block from eating the prompt budget
+MAX_PATH_RULES = 50  # cap on `paths:` entries
+
+PATH_RULES_HEADER = "Rules for specific paths (each applies only to files matching its pattern):"
+
+
+def _rules_text(v: object) -> object:
+    """A rules value may be a string or a list of strings (rendered as a bullet list)."""
+    if v is None:
+        return ""
+    if isinstance(v, list):
+        return "\n".join(f"- {str(r).strip()}" for r in v if str(r).strip())
+    return v
 
 
 class RepoConfig(BaseModel):
@@ -36,6 +50,7 @@ class RepoConfig(BaseModel):
     min_severity: Severity | None = None
     max_comments: int | None = Field(default=None, ge=0)
     rules: str = ""
+    paths: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("ignore", mode="before")
     @classmethod
@@ -47,16 +62,31 @@ class RepoConfig(BaseModel):
     @field_validator("rules", mode="before")
     @classmethod
     def _rules_text(cls, v: object) -> object:
-        if v is None:
-            return ""
-        if isinstance(v, list):
-            return "\n".join(f"- {str(r).strip()}" for r in v if str(r).strip())
-        return v
+        return _rules_text(v)
 
     @field_validator("rules")
     @classmethod
     def _rules_cap(cls, v: str) -> str:
         return v.strip()[:MAX_RULES_CHARS]
+
+    @field_validator("paths", mode="before")
+    @classmethod
+    def _paths_map(cls, v: object) -> object:
+        if v is None:
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError("paths must map glob -> rules")
+        out: dict[str, object] = {}
+        for glob, rules in v.items():
+            text = _rules_text(rules)
+            if not isinstance(text, str):
+                raise ValueError(f"rules for {glob!r} must be a string or a list of strings")
+            glob, text = str(glob).strip().removeprefix("./"), text.strip()[:MAX_RULES_CHARS]
+            if glob and text:
+                out[glob] = text
+        if len(out) > MAX_PATH_RULES:
+            log.warning("%s: only the first %d `paths` entries are used", CONFIG_PATH, MAX_PATH_RULES)
+        return dict(list(out.items())[:MAX_PATH_RULES])
 
 
 def parse_repo_config(text: str | None) -> RepoConfig:
@@ -93,10 +123,12 @@ def apply_repo_config(settings: Settings, cfg: RepoConfig) -> Settings:
         update["max_comments"] = cfg.max_comments
     if cfg.rules:
         update["rules"] = cfg.rules
+    if cfg.paths:
+        update["path_rules"] = {**settings.path_rules, **cfg.paths}
     return settings.model_copy(update=update)
 
 
-def path_ignored(path: str, patterns: list[str]) -> bool:
+def path_matches(path: str, patterns: list[str]) -> bool:
     """`dir/` matches that directory anywhere in the path; patterns without a `/` also match the
     basename (`*.snap`); anything else is an fnmatch glob on the full path (`*` crosses `/`)."""
     parts = path.split("/")
@@ -114,6 +146,25 @@ def path_ignored(path: str, patterns: list[str]) -> bool:
         elif fnmatchcase(path, pat) or ("/" not in pat and fnmatchcase(parts[-1], pat)):
             return True
     return False
+
+
+path_ignored = path_matches  # historical name, used for `ignore`
+
+
+def rules_for_paths(rules: str, path_rules: dict[str, str], paths: list[str]) -> str:
+    """Global `rules` plus every `paths:` entry whose glob matches at least one of `paths`.
+
+    Deterministic for a given set of paths, so every specialist reviewing one batch gets a byte-identical
+    system prompt (prompt caching still hits)."""
+    sections = [rules.strip()] if rules.strip() else []
+    scoped = []
+    for glob, text in path_rules.items():
+        hits = [p for p in paths if path_matches(p, [glob])]
+        if hits:
+            scoped.append(f"`{glob}` (applies to: {', '.join(hits)}):\n{text.strip()}")
+    if scoped:
+        sections.append("\n".join([PATH_RULES_HEADER, *scoped]))
+    return "\n\n".join(sections)
 
 
 def filter_ignored(diffs: list[FileDiff], patterns: list[str]) -> list[FileDiff]:
