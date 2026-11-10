@@ -251,7 +251,8 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr feedback owner/repo --days 30` | How useful were the bot's comments? 👍/👎 precision per agent and category |
 | `acr local --fail-on high` | CI gate: exit **1** if any posted finding is `high` or worse, **2** if the review itself fails, **0** otherwise (also on `acr pr`) |
 | `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
-| `acr local --format markdown --out review.md` | Markdown report grouped by file (severity icons, ```` ```suggestion ```` blocks, stats + usage footer); `--format text\|json\|markdown`, `--json` = `--format json`, `--out` writes to a file instead of stdout (`pr` too) |
+| `acr local --format markdown --out review.md` | Markdown report grouped by file (severity icons, ```` ```suggestion ```` blocks, stats + usage footer); `--format text\|json\|markdown\|sarif`, `--json` = `--format json`, `--out` writes to a file instead of stdout (`pr` too) |
+| `acr pr owner/repo 123 --format sarif --out acr.sarif` | SARIF 2.1.0 for GitHub code scanning: one rule per category, `error`/`warning`/`note` from severity, line-stable fingerprints, one-line fixes |
 | `acr -v ...` | Verbose logging |
 | `acr --version` | Print the installed version |
 
@@ -421,6 +422,20 @@ required. Exit code 2 (review crashed) is distinct from 1 (real findings), so yo
 Add `--format markdown --out review.md` and `cat review.md >> "$GITHUB_STEP_SUMMARY"` to get the
 report on the workflow run page too.
 
+To get findings as **code-scanning alerts** (Security tab + PR annotations), write SARIF and upload it
+(the job needs `permissions: security-events: write`):
+
+```yaml
+- run: acr pr ${{ github.repository }} ${{ github.event.pull_request.number }} --format sarif --out acr.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: acr.sarif
+    category: agentic-code-review
+```
+
+Fingerprints hash file + category + title (not the line), so an alert survives code moving above it.
+
 Draft PRs are skipped. On a push, only the new commits are reviewed. A new push cancels the review
 that's still running.
 
@@ -518,7 +533,9 @@ src/reviewer/
 ├── usage.py             # per-call token/latency records, price table, cost estimate, usage footer
 ├── feedback.py          # 👍/👎 reactions on posted comments → precision per agent / category
 ├── output/
-│   └── github_review.py # comment + summary formatting, posting
+│   ├── github_review.py # comment + summary formatting, posting
+│   ├── markdown.py      # --format markdown report
+│   └── sarif.py         # --format sarif (GitHub code scanning)
 ├── service.py           # shared entry points for CLI / server / Action
 ├── cli.py               # `acr`
 ├── server.py            # FastAPI webhook

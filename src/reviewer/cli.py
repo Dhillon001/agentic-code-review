@@ -6,8 +6,8 @@ acr feedback owner/repo [--days 30]         👍/👎 precision of the bot's com
 
 `pr` and `local` accept `--fail-on SEVERITY` for CI: exit 1 if any posted finding is at or above it,
 exit 2 if the review itself fails, 0 otherwise (see reviewer/gate.py). They also accept
-`--format {text,json,markdown}` (`--json` is an alias for `--format json`) and `--out PATH` to write the
-report to a file instead of stdout.
+`--format {text,json,markdown,sarif}` (`--json` is an alias for `--format json`) and `--out PATH` to write
+the report to a file instead of stdout. `sarif` is SARIF 2.1.0 for GitHub code scanning upload.
 """
 
 from __future__ import annotations
@@ -24,11 +24,12 @@ from reviewer.gate import EXIT_ERROR, EXIT_OK, SEVERITY_CHOICES, gate_exit_code,
 from reviewer.models import ReviewResult
 from reviewer.output.github_review import ICON
 from reviewer.output.markdown import format_markdown
+from reviewer.output.sarif import format_sarif
 from reviewer.service import feedback_report, review_github_pr, review_local
 from reviewer.usage import format_usage
 
 
-FORMATS = ["text", "json", "markdown"]
+FORMATS = ["text", "json", "markdown", "sarif"]
 
 
 def format_text(result: ReviewResult) -> str:
@@ -59,6 +60,8 @@ def render(result: ReviewResult, fmt: str) -> str:
         return result.model_dump_json(indent=2) + "\n"
     if fmt == "markdown":
         return format_markdown(result)
+    if fmt == "sarif":
+        return format_sarif(result)
     return format_text(result)
 
 

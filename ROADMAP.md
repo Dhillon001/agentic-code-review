@@ -18,7 +18,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 - [x] **Markdown report.** `--format {text,json,markdown}` (keep `--json` as an alias) plus `--out PATH`.
   Markdown groups findings by file with severity icons, suggestion blocks, and the usage footer.
-- [ ] **SARIF output.** `--format sarif` emits SARIF 2.1.0 (one rule per category, `level` from severity,
+- [x] **SARIF output.** `--format sarif` emits SARIF 2.1.0 (one rule per category, `level` from severity,
   physical locations, partial fingerprints) for GitHub code scanning upload. Validate structure in tests.
 
 ## Mon Nov 9

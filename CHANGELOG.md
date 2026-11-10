@@ -16,6 +16,9 @@ All notable changes to this project are documented here. The format follows
 - **Markdown report** — `acr pr|local --format {text,json,markdown}` (`--json` kept as an alias) and
   `--out PATH`. Markdown groups findings by file (most severe first) with severity icons, `suggestion` blocks,
   off-diff markers, and the funnel/usage footer — handy for `$GITHUB_STEP_SUMMARY`.
+- **SARIF output** — `--format sarif` emits SARIF 2.1.0 for `github/codeql-action/upload-sarif`: one rule per
+  category (security categories tagged with `security-severity`), `error`/`warning`/`note` levels from severity,
+  repo-relative locations, line-independent partial fingerprints, and single-line replacements as SARIF fixes.
 
 ## [0.1.0] — 2026-10-31
 
