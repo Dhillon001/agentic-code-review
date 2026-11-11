@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections import defaultdict
 
 from reviewer.agents.llm import LLM
@@ -12,6 +13,8 @@ from reviewer.config import Settings
 from reviewer.context.retriever import render_file_excerpt
 from reviewer.models import FileContext, Finding, Severity
 from reviewer.repo_config import rules_for_paths
+
+log = logging.getLogger(__name__)
 
 
 async def _verify_file(
@@ -56,14 +59,27 @@ async def _verify_file(
 
 async def verify(
     llm: LLM, findings: list[Finding], files_by_path: dict[str, FileContext], settings: Settings
-) -> tuple[list[Finding], list[Finding]]:
+) -> tuple[list[Finding], list[Finding], int]:
+    """Returns (confirmed, rejected, failed_calls). A per-file verifier call that fails (after the LLM's own
+    retries) never sinks the review: its findings count as rejected — unverified means unposted."""
     by_file: dict[str, list[Finding]] = defaultdict(list)
     for f in findings:
         by_file[f.file].append(f)
 
+    jobs = [(p, fs) for p, fs in by_file.items() if p in files_by_path]
     results = await asyncio.gather(
-        *(_verify_file(llm, files_by_path[p], fs, settings) for p, fs in by_file.items() if p in files_by_path)
+        *(_verify_file(llm, files_by_path[p], fs, settings) for p, fs in jobs), return_exceptions=True
     )
-    confirmed = [f for c, _ in results for f in c]
-    rejected = [f for _, r in results for f in r]
-    return confirmed, rejected
+    confirmed: list[Finding] = []
+    rejected: list[Finding] = []
+    failed = 0
+    for (path, fs), r in zip(jobs, results):
+        if isinstance(r, BaseException):
+            failed += 1
+            log.warning("verifier call failed for %s: %r", path, r)
+            note = f"verifier failed: {type(r).__name__}"
+            rejected.extend(f.model_copy(update={"verifier_note": note}) for f in fs)
+        else:
+            confirmed.extend(r[0])
+            rejected.extend(r[1])
+    return confirmed, rejected, failed

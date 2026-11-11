@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from reviewer.agents.resilience import RetryPolicy
 from reviewer.models import Severity
 from reviewer.usage import DEFAULT_PRICES, ModelPrice
 
@@ -89,6 +90,12 @@ class Settings(BaseSettings):
     # (env AGENT_MODELS as JSON; `.acr.yml` `models:` overrides per name). Unlisted agents use `reviewer_model`.
     agent_models: dict[str, str] = Field(default_factory=dict)
     llm_concurrency: int = 4
+    # Resilience: per-attempt timeout, and retries with exponential backoff + full jitter on transient errors
+    # (rate limit, overload, 5xx, timeout). An agent that still fails is reported in `failed_agents`.
+    llm_timeout_s: float = 180.0
+    llm_max_retries: int = 3
+    llm_backoff_base_s: float = 1.0
+    llm_backoff_max_s: float = 30.0
     # Run one specialist per batch before the rest so the shared-context prompt cache is written
     # once and read by the others (parallel cold calls would each pay the full input price).
     cache_warmup: bool = True
@@ -128,6 +135,14 @@ class Settings(BaseSettings):
     @classmethod
     def _agent_models(cls, v: object) -> dict[str, str]:
         return normalize_agent_models(v, "AGENT_MODELS")
+
+    def retry_policy(self) -> RetryPolicy:
+        return RetryPolicy(
+            timeout_s=self.llm_timeout_s if self.llm_timeout_s > 0 else None,
+            max_retries=max(0, self.llm_max_retries),
+            backoff_base_s=max(0.0, self.llm_backoff_base_s),
+            backoff_max_s=max(0.0, self.llm_backoff_max_s),
+        )
 
     def model_for(self, agent: str) -> str:
         """The model a specialist runs on: its `agent_models` entry, else `reviewer_model`."""

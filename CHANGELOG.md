@@ -40,6 +40,11 @@ All notable changes to this project are documented here. The format follows
   goroutine leaks, Java nulls and unclosed resources, SQL injection in raw queries). The hints live in one
   table in `agents/languages.py`, are scoped per batch so prompt caching still hits, and `LANGUAGE_HINTS=false`
   turns them off.
+- **Resilient agent calls** — every model call gets a per-attempt timeout (`LLM_TIMEOUT_S`) and up to
+  `LLM_MAX_RETRIES` retries with exponential backoff + full jitter on transient errors (rate limit, overload,
+  5xx, timeout, dropped connection), honouring `retry-after`; other errors fail fast. Agents that still fail are
+  listed in `ReviewResult.failed_agents` and flagged as a "partial review" in the GitHub summary, Markdown and
+  text reports; a failed verifier call holds that file's findings back. One failing agent never crashes a review.
 
 ## [0.1.0] — 2026-10-31
 

@@ -46,6 +46,8 @@ def format_text(result: ReviewResult) -> str:
         if f.single_line_replacement is not None:
             lines.append(f"   replace line {f.line} with: {f.single_line_replacement}")
         lines.append("")
+    if result.partial:
+        lines.append(f"⚠️  partial review: {', '.join(result.failed_agents)} failed after retries")
     lines.append(f"stats: {result.stats}")
     lines.append(f"usage: {format_usage(result.usage)}")
     return "\n".join(lines) + "\n"

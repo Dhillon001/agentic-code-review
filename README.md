@@ -193,6 +193,14 @@ senior-engineer prompt. It sees the code again and returns a verdict for each fi
 Rejected findings aren't thrown away. They're kept in `ReviewResult.rejected`, which is exactly the data you
 want when tuning prompts.
 
+#### 🛟 Partial reviews, never crashes
+
+Every model call gets a per-attempt timeout and is retried with exponential backoff + jitter on transient
+errors (rate limits, overload, 5xx, timeouts); bad requests and auth errors fail fast. If an agent still fails,
+the rest of the review carries on: the agent is listed in `ReviewResult.failed_agents` and the summary says
+**⚠️ Partial review** with its name. If a verifier call fails, that file's findings are held back (unverified
+means unposted) and `verifier` is listed.
+
 ### Stage 5 — Rank & place 🎯
 
 1. Drop anything below `MIN_SEVERITY`, sort by severity then confidence, keep the top `MAX_COMMENTS`.
@@ -342,6 +350,9 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `VERIFIER_MODEL` | `claude-opus-5-5` | Stronger model that verifies findings |
 | `AGENT_MODELS` | `{}` | Per-specialist model, e.g. `{"security": "claude-opus-5-5", "tests": "claude-haiku-4-5"}`; unlisted agents use `REVIEWER_MODEL` (`.acr.yml` `models:` overrides per name) |
 | `LLM_CONCURRENCY` | `4` | Max model calls in flight |
+| `LLM_TIMEOUT_S` | `180` | Per-attempt timeout for one model call (`0` = none) |
+| `LLM_MAX_RETRIES` | `3` | Retries on transient errors (rate limit, overload, 5xx, timeout, dropped connection) |
+| `LLM_BACKOFF_BASE_S` / `LLM_BACKOFF_MAX_S` | `1` / `30` | Exponential backoff with full jitter between retries (a `retry-after` header is honoured up to the max) |
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
 | `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
 | `VERIFY` | `true` | Turn the verifier off (useful for evals) |
@@ -583,6 +594,7 @@ src/reviewer/
 │   ├── specialists.py   # the four reviewers
 │   ├── languages.py     # extension → language pitfalls table (language hints)
 │   ├── verifier.py      # second-pass fact checker
+│   ├── resilience.py    # timeouts + retries with backoff/jitter around any LLM
 │   └── llm.py           # LLM protocol + Anthropic implementation
 ├── pipeline.py          # orchestration: batch → fan out → dedupe → verify → rank → place
 ├── ranking.py           # dedupe · severity/cap ranking · snap-to-diff-line

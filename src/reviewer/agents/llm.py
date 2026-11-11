@@ -11,6 +11,7 @@ flatten the blocks with `as_text`.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from typing import Any, Protocol, Union
 
@@ -45,16 +46,18 @@ class LLM(Protocol):
 
 
 class AnthropicLLM:
-    def __init__(self, api_key: str, concurrency: int = 4):
+    def __init__(self, api_key: str, concurrency: int | None = 4, max_retries: int = 3):
+        """`concurrency=None` leaves limiting to a wrapper (`ResilientLLM`); `max_retries=0` leaves retrying
+        to it too, so the SDK and the wrapper don't both back off on the same error."""
         from anthropic import AsyncAnthropic
 
-        self.client = AsyncAnthropic(api_key=api_key, max_retries=3)
-        self._sem = asyncio.Semaphore(concurrency)
+        self.client = AsyncAnthropic(api_key=api_key, max_retries=max_retries)
+        self._sem = asyncio.Semaphore(concurrency) if concurrency else None
 
     async def call_tool(
         self, *, model: str, system: str, user: UserContent, tool: dict, max_tokens: int = 8000
     ) -> dict[str, Any]:
-        async with self._sem:
+        async with self._sem or contextlib.nullcontext():
             t0 = time.perf_counter()
             resp = await self.client.messages.create(
                 model=model,

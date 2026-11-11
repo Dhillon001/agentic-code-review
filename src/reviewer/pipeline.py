@@ -110,12 +110,16 @@ async def _review(
 
     raw = []
     errors = 0
-    for r in results:
-        if isinstance(r, BaseException):
-            errors += 1
-            log.warning("specialist call failed: %r", r)
-        else:
-            raw.extend(r)
+    failed_agents: list[str] = []  # in specialist order, each name once
+    for batch_results in per_batch:
+        for spec, r in zip(specialists, batch_results):
+            if isinstance(r, BaseException):
+                errors += 1
+                log.warning("specialist %s failed after retries: %r", spec.name, r)
+                if spec.name not in failed_agents:
+                    failed_agents.append(spec.name)
+            else:
+                raw.extend(r)
 
     # secrets go first so they win ties in dedupe (an agent flagging the same line is a duplicate)
     candidates = dedupe([f for f in [*secrets, *raw] if f.confidence >= settings.min_confidence])
@@ -128,8 +132,11 @@ async def _review(
     candidates, suppressed = split_suppressed(candidates, suppressions)
 
     to_verify = [f for f in candidates if id(f) not in deterministic]
+    verifier_errors = 0
     if settings.verify and to_verify:
-        confirmed, rejected = await verify(llm, to_verify, files_by_path, settings)
+        confirmed, rejected, verifier_errors = await verify(llm, to_verify, files_by_path, settings)
+        if verifier_errors:
+            failed_agents.append("verifier")
     else:
         confirmed, rejected = to_verify, []
     confirmed = [f for f in candidates if id(f) in deterministic] + confirmed
@@ -148,12 +155,14 @@ async def _review(
         inline=scrub(inline, secret_values),
         summary_only=scrub(summary_only, secret_values),
         rejected=scrub(rejected, secret_values),
+        failed_agents=failed_agents,
         stats={
             "files": len(reviewable),
             "skipped": len(pr.skipped),
             "batches": len(batches),
             "agent_calls": len(results),
             "agent_errors": errors,
+            "verifier_errors": verifier_errors,
             "secrets": len(secrets),
             "raw_findings": len(raw),
             "already_commented": len(repeats) + len(snapped_repeats),

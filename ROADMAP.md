@@ -41,7 +41,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Wed Nov 11
 
-- [ ] **Resilient agent calls.** Per-call timeout and retry with exponential backoff + jitter on transient
+- [x] **Resilient agent calls.** Per-call timeout and retry with exponential backoff + jitter on transient
   errors (rate limit, overload, timeout). Agents that still fail are listed in `ReviewResult.failed_agents` and
   in the summary comment ("partial review"); the review never crashes on one agent.
 - [ ] **Cost budget.** `MAX_COST_USD`: estimate input tokens (chars/4) and cost before calling; if over budget,

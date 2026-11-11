@@ -40,14 +40,28 @@ def format_comment(f: Finding) -> str:
     return out
 
 
+def partial_note(result: ReviewResult) -> str:
+    """One line warning that some agents failed after retries ("" for a complete review)."""
+    if not result.failed_agents:
+        return ""
+    names = ", ".join(f"`{n}`" for n in result.failed_agents)
+    return (
+        f"⚠️ **Partial review:** {names} failed after retries, so some findings may be missing. "
+        "Re-run the review to fill the gap."
+    )
+
+
 def format_summary(result: ReviewResult) -> str:
     posted = result.inline + result.summary_only
     usage = f"\n\n<sub>💸 {format_usage(result.usage)}</sub>" if result.usage.calls else ""
+    partial = f"\n\n{partial_note(result)}" if result.partial else ""
     if not posted:
-        return "🤖 **Agentic review:** no issues found that survived verification." + usage
+        return "🤖 **Agentic review:** no issues found that survived verification." + partial + usage
     counts = Counter(f.severity.value for f in posted)
     tally = " · ".join(f"{ICON[s]} {counts[s]} {s}" for s in ICON if counts[s])
     lines = [f"🤖 **Agentic review:** {tally}"]
+    if result.partial:
+        lines.append(f"\n{partial_note(result)}")
     if result.summary_only:
         lines.append("\n**Outside the diff:**")
         for f in result.summary_only:
