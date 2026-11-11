@@ -53,12 +53,20 @@ async def _review_batch(
     async def one(spec: Specialist) -> list[Finding]:
         return await run_specialist(llm, spec, pr, batch, settings, shared_context=shared)
 
-    head: list[list[Finding] | BaseException] = []
-    rest = specialists
-    if settings.cache_warmup and len(specialists) > 1:
-        head = list(await asyncio.gather(one(specialists[0]), return_exceptions=True))
-        rest = specialists[1:]
-    return head + list(await asyncio.gather(*(one(s) for s in rest), return_exceptions=True))
+    if not settings.cache_warmup or len(specialists) < 2:
+        return list(await asyncio.gather(*(one(s) for s in specialists), return_exceptions=True))
+    # The prompt cache is per model, so warm it once per model: the first specialist on each model runs
+    # (alongside the other models' warmers), then everyone else reads the cache their model wrote.
+    warmers: dict[str, int] = {}
+    for i, spec in enumerate(specialists):
+        warmers.setdefault(settings.model_for(spec.name), i)
+    first = set(warmers.values())
+    rest = [i for i in range(len(specialists)) if i not in first]
+    order = sorted(first) + rest
+    head = await asyncio.gather(*(one(specialists[i]) for i in sorted(first)), return_exceptions=True)
+    tail = await asyncio.gather(*(one(specialists[i]) for i in rest), return_exceptions=True)
+    by_index = dict(zip(order, [*head, *tail]))
+    return [by_index[i] for i in range(len(specialists))]
 
 
 async def review(

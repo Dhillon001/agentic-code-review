@@ -31,6 +31,10 @@ All notable changes to this project are documented here. The format follows
   and optional `severity_floor` (that agent's own minimum severity, held even if the verifier downgrades);
   `disable: [performance]` (or `DISABLE_AGENTS`) switches built-in or custom agents off. Names are validated,
   can't shadow built-ins, and bad entries or unknown disables are skipped with a warning.
+- **Per-agent model routing** — `AGENT_MODELS` (JSON) and `.acr.yml` `models:` map a specialist name to a
+  model, e.g. Opus for `security` and Haiku for `tests`; unlisted agents fall back to `REVIEWER_MODEL`. Usage
+  and cost estimates are tracked per model, cache warm-up runs once per model, and unknown agent names or
+  invalid model ids are ignored with a warning.
 
 ## [0.1.0] — 2026-10-31
 

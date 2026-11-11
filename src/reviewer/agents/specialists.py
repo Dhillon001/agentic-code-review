@@ -65,6 +65,8 @@ def build_specialists(settings: Settings) -> list[Specialist]:
     disabled = {str(n).strip().lower() for n in settings.disable_agents if str(n).strip()}
     for name in sorted(disabled - known):
         log.warning("ignoring unknown agent in disable list: %r (known: %s)", name, ", ".join(sorted(known)))
+    for name in sorted(set(settings.agent_models) - known):
+        log.warning("ignoring model route for unknown agent %r (known: %s)", name, ", ".join(sorted(known)))
     return [s for s in pool if s.name not in disabled]
 
 
@@ -106,7 +108,7 @@ async def run_specialist(
     if shared_context is None:
         shared_context = build_review_prompt(pr, files, settings)
     data = await llm.call_tool(
-        model=settings.reviewer_model,
+        model=settings.model_for(spec.name),
         system=reviewer_system(rules_for_paths(settings.rules, settings.path_rules, [fc.path for fc in files])),
         user=build_specialist_content(spec, shared_context),
         tool=FINDINGS_TOOL,

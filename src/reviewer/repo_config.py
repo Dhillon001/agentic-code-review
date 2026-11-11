@@ -14,6 +14,8 @@
         focus: Missing alt text, unlabeled form controls, keyboard traps.
         severity_floor: medium   # optional: drop this agent's findings below it
     disable: [performance]       # built-in (or custom) specialists to switch off
+    models:                      # per-specialist model; others use REVIEWER_MODEL
+      security: claude-opus-5-5
 
 A broken file never breaks a review: bad YAML is ignored and bad fields fall back to defaults.
 """
@@ -26,7 +28,7 @@ from fnmatch import fnmatchcase
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from reviewer.config import CustomAgent, Settings
+from reviewer.config import CustomAgent, Settings, normalize_agent_models
 from reviewer.ingest.sources import Source
 from reviewer.models import FileDiff, Severity
 
@@ -59,6 +61,7 @@ class RepoConfig(BaseModel):
     paths: dict[str, str] = Field(default_factory=dict)
     agents: list[CustomAgent] = Field(default_factory=list)
     disable: list[str] = Field(default_factory=list)
+    models: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("ignore", mode="before")
     @classmethod
@@ -130,6 +133,11 @@ class RepoConfig(BaseModel):
             raise ValueError("disable must be a list of agent names")
         return [str(n).strip().lower() for n in items if str(n).strip()]
 
+    @field_validator("models", mode="before")
+    @classmethod
+    def _models_map(cls, v: object) -> dict[str, str]:
+        return normalize_agent_models(v, f"{CONFIG_PATH} models")
+
 
 def parse_repo_config(text: str | None) -> RepoConfig:
     if not text or not text.strip():
@@ -172,6 +180,8 @@ def apply_repo_config(settings: Settings, cfg: RepoConfig) -> Settings:
         update["custom_agents"] = [*(a for a in settings.custom_agents if a.name not in repo_names), *cfg.agents]
     if cfg.disable:
         update["disable_agents"] = [*settings.disable_agents, *cfg.disable]
+    if cfg.models:
+        update["agent_models"] = {**settings.agent_models, **cfg.models}
     return settings.model_copy(update=update)
 
 

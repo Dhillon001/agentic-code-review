@@ -335,6 +335,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `GITHUB_WEBHOOK_SECRET` | — | Required for the webhook server |
 | `REVIEWER_MODEL` | `claude-sonnet-5-5` | Faster model that runs the four specialists |
 | `VERIFIER_MODEL` | `claude-opus-5-5` | Stronger model that verifies findings |
+| `AGENT_MODELS` | `{}` | Per-specialist model, e.g. `{"security": "claude-opus-5-5", "tests": "claude-haiku-4-5"}`; unlisted agents use `REVIEWER_MODEL` (`.acr.yml` `models:` overrides per name) |
 | `LLM_CONCURRENCY` | `4` | Max model calls in flight |
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
 | `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
@@ -398,6 +399,9 @@ agents:              # extra specialists, run in parallel alongside the built-in
     focus: PII written to logs, analytics, or third-party calls.
     severity_floor: high   # optional: drop this agent's findings below high
 disable: [performance]     # switch off built-in (or custom) specialists
+models:                    # per-specialist model; unlisted agents use REVIEWER_MODEL
+  security: claude-opus-5-5
+  tests: claude-haiku-4-5
 ```
 
 <details>
@@ -418,6 +422,10 @@ disable: [performance]     # switch off built-in (or custom) specialists
   go through the same verifier, ranking, and `acr: ignore[name]` suppressions as built-ins.
 - `disable` takes built-in or custom names; an unknown name is ignored with a warning. Disabling every agent
   leaves only the secret-scanning pre-pass.
+- `models` maps a built-in or custom agent name to a model id and overrides an `AGENT_MODELS` entry of the
+  same name. The verifier always uses `VERIFIER_MODEL`. A route for an unknown agent, or an invalid model id, is
+  ignored with a warning. Usage and estimated cost are tallied per model (`by_model` in `--json`), and prompt
+  caching warms once per model, since the cache isn't shared across models.
 - **A bad config never blocks a review:** invalid YAML is ignored, and invalid fields fall back to defaults.
 
 </details>

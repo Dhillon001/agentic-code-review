@@ -33,7 +33,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
   pydantic"`); rules are injected only into prompts for batches containing matching files.
 - [x] **Custom specialists.** `.acr.yml` `agents:` adds reviewers (`name`, `focus`, optional `severity_floor`)
   and `disable: [performance]` turns built-ins off. Validate names; unknown disables are ignored with a warning.
-- [ ] **Per-agent model routing.** `AGENT_MODELS` setting (and `.acr.yml` `models:`) maps specialist name →
+- [x] **Per-agent model routing.** `AGENT_MODELS` setting (and `.acr.yml` `models:`) maps specialist name →
   model, falling back to `reviewer_model`. Usage tracking and prices work per model.
 - [ ] **Language hints.** Detect each file's language from its extension and add a short, language-specific
   pitfalls list to the specialist prompt (Python async/mutable defaults, JS/TS promises/`==`, Go error handling
