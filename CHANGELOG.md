@@ -27,6 +27,10 @@ All notable changes to this project are documented here. The format follows
   `"src/api/**": Validate input with pydantic`. Rules reach only the prompts of batches containing a matching
   file (and that file's verifier call), so unrelated code isn't judged against them; per-batch system prompts
   stay byte-identical across specialists, so prompt caching still hits.
+- **Custom specialists** — `.acr.yml` `agents:` (or `CUSTOM_AGENTS`) adds reviewers with a `name`, `focus`,
+  and optional `severity_floor` (that agent's own minimum severity, held even if the verifier downgrades);
+  `disable: [performance]` (or `DISABLE_AGENTS`) switches built-in or custom agents off. Names are validated,
+  can't shadow built-ins, and bad entries or unknown disables are skipped with a warning.
 
 ## [0.1.0] — 2026-10-31
 

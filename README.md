@@ -57,7 +57,8 @@ This project makes the opposite bet — **precision over volume**:
 - **Verifier pass** on a stronger model; anything it doesn't confirm is dropped (and kept for tuning).
 - **Lands on real diff lines** — findings are snapped to commentable lines; severity floor and hard cap per PR.
 - **One-click fixes** — single-line fixes post as GitHub ` ```suggestion ` blocks.
-- **Per-repo `.acr.yml`** — ignores, severity floor, comment cap, free-text team rules, and per-path rules.
+- **Per-repo `.acr.yml`** — ignores, severity floor, comment cap, free-text team rules, per-path rules, and
+  custom specialists (or built-ins switched off).
 - **Skips noise** — lockfiles, minified/generated code, vendored dirs, and binaries never cost a token.
 - **Incremental re-reviews** — only new commits are reviewed, and the bot never repeats a comment.
 - **Cheap to run** — shared PR context is prompt-cached across specialists; every review reports tokens,
@@ -137,6 +138,8 @@ Every specialist reviews every batch, **all in parallel**:
 | 🔒 **security** | injection (SQL / shell / template), auth gaps, secrets in code, unsafe deserialization, path traversal, SSRF |
 | ⚡ **performance** | N+1 queries, accidental quadratic loops, unbounded memory/IO, blocking calls in async code |
 | 🧪 **tests** | new behaviour or risky branches with no test, tests that assert nothing, tests edited to pass |
+
+Add your own reviewers (or switch built-ins off) with `.acr.yml` [`agents:` / `disable:`](#per-repo-config-acryml).
 
 All agents share the same ground rules: only report problems **introduced or exposed by this change**, cite
 the exact line, explain concretely what goes wrong, give an honest confidence score, and treat
@@ -342,6 +345,8 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `MAX_COMMENTS` | `10` | Hard cap on comments per PR |
 | `IGNORE` | `[]` | Extra path globs never reviewed (JSON list) |
 | `PATH_RULES` | `{}` | Glob → extra rules for matching files only (JSON object; `.acr.yml` `paths:` overrides per glob) |
+| `CUSTOM_AGENTS` | `[]` | Extra specialists, e.g. `[{"name": "docs", "focus": "…"}]` (`.acr.yml` `agents:` adds to / overrides by name) |
+| `DISABLE_AGENTS` | `[]` | Specialist names to switch off (JSON list; `.acr.yml` `disable:` adds to it) |
 | `MAX_FILES` | `50` | Max files reviewed per PR |
 | `FULL_FILE_MAX_LINES` | `400` | Send the whole file if it's shorter than this |
 | `CONTEXT_LINES` | `30` | Window size around hunks for longer files |
@@ -386,6 +391,13 @@ paths:               # extra rules only for files matching a glob (same glob syn
   "*.sql":
     - Every migration is reversible.
     - No SELECT *.
+agents:              # extra specialists, run in parallel alongside the built-ins
+  - name: accessibility
+    focus: Missing alt text, unlabeled form controls, keyboard traps, colour-only cues.
+  - name: data-privacy
+    focus: PII written to logs, analytics, or third-party calls.
+    severity_floor: high   # optional: drop this agent's findings below high
+disable: [performance]     # switch off built-in (or custom) specialists
 ```
 
 <details>
@@ -398,6 +410,14 @@ paths:               # extra rules only for files matching a glob (same glob syn
 - `paths` rules are injected only into the prompts of file batches that contain a matching file (and into the
   verifier's prompt for that file), labelled with the files they apply to. Each value is a string or list,
   capped like `rules`; at most 50 globs are used. Repo entries override a `PATH_RULES` entry with the same glob.
+- `agents` names are 1–40 chars of `a-z 0-9 - _` starting with a letter, and can't reuse a built-in name
+  (`correctness`, `security`, `performance`, `tests`) or `secrets`/`verifier` — to replace a built-in, disable
+  it and add yours under a new name. Each `focus` is capped at 1,000 characters and at most 8 custom agents are
+  used (each one is a model call per batch). An invalid entry is skipped with a warning; the others still run.
+  `severity_floor` is that agent's own minimum severity, applied before and after verification. Custom agents
+  go through the same verifier, ranking, and `acr: ignore[name]` suppressions as built-ins.
+- `disable` takes built-in or custom names; an unknown name is ignored with a warning. Disabling every agent
+  leaves only the secret-scanning pre-pass.
 - **A bad config never blocks a review:** invalid YAML is ignored, and invalid fields fall back to defaults.
 
 </details>

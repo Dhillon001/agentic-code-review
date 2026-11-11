@@ -31,7 +31,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 - [x] **Per-path rules.** `.acr.yml` `paths:` maps globs to extra rules (`"src/api/**": "Validate input with
   pydantic"`); rules are injected only into prompts for batches containing matching files.
-- [ ] **Custom specialists.** `.acr.yml` `agents:` adds reviewers (`name`, `focus`, optional `severity_floor`)
+- [x] **Custom specialists.** `.acr.yml` `agents:` adds reviewers (`name`, `focus`, optional `severity_floor`)
   and `disable: [performance]` turns built-ins off. Validate names; unknown disables are ignored with a warning.
 - [ ] **Per-agent model routing.** `AGENT_MODELS` setting (and `.acr.yml` `models:`) maps specialist name →
   model, falling back to `reviewer_model`. Usage tracking and prices work per model.

@@ -8,9 +8,9 @@ import time
 
 from reviewer.agents.llm import LLM
 from reviewer.agents.specialists import (
-    SPECIALISTS,
     Specialist,
     build_review_prompt,
+    build_specialists,
     render_files,
     run_specialist,
 )
@@ -86,7 +86,8 @@ async def _review(
     specialists: list[Specialist] | None,
     already_commented: set[tuple[str, int]] | None,
 ) -> ReviewResult:
-    specialists = specialists or SPECIALISTS
+    if specialists is None:
+        specialists = build_specialists(settings)  # built-ins + .acr.yml `agents:` - `disable:`
     reviewable = [fc for fc in pr.files if fc.diff.status != "deleted" and fc.diff.hunks]
     if not reviewable:
         return ReviewResult(stats={"files": 0, "skipped": len(pr.skipped)})
@@ -124,6 +125,9 @@ async def _review(
     else:
         confirmed, rejected = to_verify, []
     confirmed = [f for f in candidates if id(f) in deterministic] + confirmed
+    # an agent's own severity floor holds even if the verifier downgraded one of its findings
+    by_name = {s.name: s for s in specialists}
+    confirmed = [f for f in confirmed if f.agent not in by_name or by_name[f.agent].keeps(f)]
 
     ranked = rank(confirmed, settings.min_severity, settings.max_comments)
     inline, summary_only = place(ranked, files_by_path)

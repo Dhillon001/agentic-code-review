@@ -9,6 +9,11 @@
     paths:                       # extra rules only for batches/files matching the glob
       "src/api/**": Validate input with pydantic models.
       "*.sql": [Every migration is reversible, No SELECT *]
+    agents:                      # extra specialists, run alongside the built-ins
+      - name: accessibility
+        focus: Missing alt text, unlabeled form controls, keyboard traps.
+        severity_floor: medium   # optional: drop this agent's findings below it
+    disable: [performance]       # built-in (or custom) specialists to switch off
 
 A broken file never breaks a review: bad YAML is ignored and bad fields fall back to defaults.
 """
@@ -21,7 +26,7 @@ from fnmatch import fnmatchcase
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from reviewer.config import Settings
+from reviewer.config import CustomAgent, Settings
 from reviewer.ingest.sources import Source
 from reviewer.models import FileDiff, Severity
 
@@ -30,6 +35,7 @@ log = logging.getLogger(__name__)
 CONFIG_PATH = ".acr.yml"
 MAX_RULES_CHARS = 4000  # keep a runaway rules block from eating the prompt budget
 MAX_PATH_RULES = 50  # cap on `paths:` entries
+MAX_CUSTOM_AGENTS = 8  # each one is a model call per batch
 
 PATH_RULES_HEADER = "Rules for specific paths (each applies only to files matching its pattern):"
 
@@ -51,6 +57,8 @@ class RepoConfig(BaseModel):
     max_comments: int | None = Field(default=None, ge=0)
     rules: str = ""
     paths: dict[str, str] = Field(default_factory=dict)
+    agents: list[CustomAgent] = Field(default_factory=list)
+    disable: list[str] = Field(default_factory=list)
 
     @field_validator("ignore", mode="before")
     @classmethod
@@ -87,6 +95,40 @@ class RepoConfig(BaseModel):
         if len(out) > MAX_PATH_RULES:
             log.warning("%s: only the first %d `paths` entries are used", CONFIG_PATH, MAX_PATH_RULES)
         return dict(list(out.items())[:MAX_PATH_RULES])
+
+    @field_validator("agents", mode="before")
+    @classmethod
+    def _agents_list(cls, v: object) -> object:
+        """Validate entries one by one: a bad agent is skipped with a warning, the rest still run."""
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("agents must be a list of {name, focus, severity_floor?}")
+        out: dict[str, CustomAgent] = {}
+        for i, raw in enumerate(v):
+            if not isinstance(raw, dict):
+                log.warning("%s: ignoring agents[%d]: expected a mapping with name and focus", CONFIG_PATH, i)
+                continue
+            try:
+                agent = CustomAgent.model_validate(raw)
+            except ValidationError as e:
+                msgs = "; ".join(err["msg"] for err in e.errors())
+                log.warning("%s: ignoring agents[%d] (%s)", CONFIG_PATH, i, msgs)
+                continue
+            out[agent.name] = agent  # a repeated name: last definition wins, first position kept
+        if len(out) > MAX_CUSTOM_AGENTS:
+            log.warning("%s: only the first %d `agents` are used", CONFIG_PATH, MAX_CUSTOM_AGENTS)
+        return list(out.values())[:MAX_CUSTOM_AGENTS]
+
+    @field_validator("disable", mode="before")
+    @classmethod
+    def _disable_list(cls, v: object) -> object:
+        if v is None:
+            return []
+        items = [v] if isinstance(v, str) else v
+        if not isinstance(items, list):
+            raise ValueError("disable must be a list of agent names")
+        return [str(n).strip().lower() for n in items if str(n).strip()]
 
 
 def parse_repo_config(text: str | None) -> RepoConfig:
@@ -125,6 +167,11 @@ def apply_repo_config(settings: Settings, cfg: RepoConfig) -> Settings:
         update["rules"] = cfg.rules
     if cfg.paths:
         update["path_rules"] = {**settings.path_rules, **cfg.paths}
+    if cfg.agents:
+        repo_names = {a.name for a in cfg.agents}  # a repo agent replaces a global one of the same name
+        update["custom_agents"] = [*(a for a in settings.custom_agents if a.name not in repo_names), *cfg.agents]
+    if cfg.disable:
+        update["disable_agents"] = [*settings.disable_agents, *cfg.disable]
     return settings.model_copy(update=update)
 
 

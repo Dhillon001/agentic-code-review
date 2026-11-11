@@ -25,7 +25,7 @@ class FakeLLM:
         self.users.append(user)
         user = as_text(user)
         if tool["name"] == "report_findings":
-            agent = re.search(r"You are the `(\w+)` reviewer", user).group(1)
+            agent = re.search(r"You are the `([\w-]+)` reviewer", user).group(1)
             return {"findings": self.findings_by_agent.get(agent, [])}
         # verifier: parse the listing back out of the prompt
         import json
