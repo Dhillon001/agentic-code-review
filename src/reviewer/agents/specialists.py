@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
+from reviewer.agents.languages import language_hints
 from reviewer.agents.llm import LLM, UserContent, cached_text, text_block
 from reviewer.agents.prompts import COMMON_RULES, FINDINGS_TOOL, SPECIALIST_FOCUS, with_team_rules
 from reviewer.config import Settings
@@ -34,10 +35,20 @@ class Specialist:
         )
 
 
-def reviewer_system(rules: str = "") -> str:
+def reviewer_system(rules: str = "", hints: str = "") -> str:
     """System prompt shared by every specialist. Must not vary per specialist, or the cache misses.
-    (It may vary per batch: `paths:` rules are only included for batches containing matching files.)"""
-    return with_team_rules(COMMON_RULES, rules)
+    (It may vary per batch: `paths:` rules and language hints only cover the batch's files.)"""
+    system = f"{COMMON_RULES}\n{hints}\n" if hints.strip() else COMMON_RULES
+    return with_team_rules(system, rules)
+
+
+def batch_system(files: list[FileContext], settings: Settings) -> str:
+    """The specialist system prompt for one batch of files."""
+    paths = [fc.path for fc in files]
+    return reviewer_system(
+        rules_for_paths(settings.rules, settings.path_rules, paths),
+        language_hints(paths) if settings.language_hints else "",
+    )
 
 
 SPECIALISTS = [Specialist(name, focus) for name, focus in SPECIALIST_FOCUS.items()]
@@ -109,7 +120,7 @@ async def run_specialist(
         shared_context = build_review_prompt(pr, files, settings)
     data = await llm.call_tool(
         model=settings.model_for(spec.name),
-        system=reviewer_system(rules_for_paths(settings.rules, settings.path_rules, [fc.path for fc in files])),
+        system=batch_system(files, settings),
         user=build_specialist_content(spec, shared_context),
         tool=FINDINGS_TOOL,
     )

@@ -35,6 +35,11 @@ All notable changes to this project are documented here. The format follows
   model, e.g. Opus for `security` and Haiku for `tests`; unlisted agents fall back to `REVIEWER_MODEL`. Usage
   and cost estimates are tracked per model, cache warm-up runs once per model, and unknown agent names or
   invalid model ids are ignored with a warning.
+- **Language hints** — specialists get a short pitfalls checklist for each language in their batch, detected
+  by file extension (Python async/mutable defaults, JS/TS floating promises and `==`, Go ignored errors and
+  goroutine leaks, Java nulls and unclosed resources, SQL injection in raw queries). The hints live in one
+  table in `agents/languages.py`, are scoped per batch so prompt caching still hits, and `LANGUAGE_HINTS=false`
+  turns them off.
 
 ## [0.1.0] — 2026-10-31
 

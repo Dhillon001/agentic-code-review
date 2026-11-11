@@ -139,6 +139,11 @@ Every specialist reviews every batch, **all in parallel**:
 | ⚡ **performance** | N+1 queries, accidental quadratic loops, unbounded memory/IO, blocking calls in async code |
 | 🧪 **tests** | new behaviour or risky branches with no test, tests that assert nothing, tests edited to pass |
 
+Each batch's prompt also carries a short **language-specific pitfalls checklist** for the languages it
+contains, detected by extension — Python (async, mutable defaults), JavaScript/TypeScript (floating promises,
+`==`), Go (ignored errors, goroutine leaks), Java (nulls, unclosed resources) and SQL (injection in dynamic
+queries). The table lives in `agents/languages.py`; set `LANGUAGE_HINTS=false` to leave it out.
+
 Add your own reviewers (or switch built-ins off) with `.acr.yml` [`agents:` / `disable:`](#per-repo-config-acryml).
 
 All agents share the same ground rules: only report problems **introduced or exposed by this change**, cite
@@ -340,6 +345,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
 | `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
 | `VERIFY` | `true` | Turn the verifier off (useful for evals) |
+| `LANGUAGE_HINTS` | `true` | Add a language-specific pitfalls checklist (by file extension) to specialist prompts |
 | `SECRET_SCAN` | `true` | Regex pre-pass for hardcoded credentials on added lines |
 | `MIN_CONFIDENCE` | `0.5` | Drop agent findings below this before verification |
 | `MIN_SEVERITY` | `medium` | `low` · `medium` · `high` · `critical` |
@@ -575,6 +581,7 @@ src/reviewer/
 ├── agents/
 │   ├── prompts.py       # every word the models see + the tool schemas
 │   ├── specialists.py   # the four reviewers
+│   ├── languages.py     # extension → language pitfalls table (language hints)
 │   ├── verifier.py      # second-pass fact checker
 │   └── llm.py           # LLM protocol + Anthropic implementation
 ├── pipeline.py          # orchestration: batch → fan out → dedupe → verify → rank → place

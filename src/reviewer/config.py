@@ -98,6 +98,8 @@ class Settings(BaseSettings):
 
     # Pipeline behaviour
     verify: bool = True
+    # language-specific pitfalls checklist (by file extension) in specialist prompts; see agents/languages.py
+    language_hints: bool = True
     secret_scan: bool = True  # regex pre-pass for credentials on added lines (critical, skips the verifier)
     min_confidence: float = 0.5  # drop raw findings below this before verification
     min_severity: str = "medium"  # low | medium | high | critical
