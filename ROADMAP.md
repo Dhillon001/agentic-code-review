@@ -44,7 +44,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 - [x] **Resilient agent calls.** Per-call timeout and retry with exponential backoff + jitter on transient
   errors (rate limit, overload, timeout). Agents that still fail are listed in `ReviewResult.failed_agents` and
   in the summary comment ("partial review"); the review never crashes on one agent.
-- [ ] **Cost budget.** `MAX_COST_USD`: estimate input tokens (chars/4) and cost before calling; if over budget,
+- [x] **Cost budget.** `MAX_COST_USD`: estimate input tokens (chars/4) and cost before calling; if over budget,
   drop lowest-priority files until it fits and report them as `skipped_budget` (and in the summary).
 - [ ] **Risk-ranked files for large PRs.** When files exceed `max_files` or the budget, order by a risk score
   (security-sensitive paths like `auth`/`crypto`/`sql`, lines changed, new files, test files last). List

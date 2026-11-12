@@ -1,4 +1,4 @@
-"""Orchestration: secret pre-pass + specialists x file-batches in parallel -> dedupe -> verify -> rank -> place."""
+"""Orchestration: secret pre-pass + cost budget + specialists x file-batches in parallel -> dedupe -> verify -> rank -> place."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from reviewer.agents.specialists import (
     run_specialist,
 )
 from reviewer.agents.verifier import verify
+from reviewer.budget import fit_budget
 from reviewer.config import Settings
 from reviewer.models import FileContext, Finding, PRContext, ReviewResult
 from reviewer.ranking import dedupe, place, rank
@@ -104,7 +105,10 @@ async def _review(
     secrets, secret_values = scan_secrets(reviewable) if settings.secret_scan else ([], set())
     deterministic = {id(f) for f in secrets}
 
-    batches = batch_files(reviewable, settings)
+    # cost budget: the specialists only see the files whose estimated cost fits (the secret scan and
+    # suppressions above/below still cover every file: they're free)
+    to_review, over_budget, _ = fit_budget(pr, reviewable, specialists, settings)
+    batches = batch_files(to_review, settings)
     per_batch = await asyncio.gather(*(_review_batch(llm, specialists, pr, b, settings) for b in batches))
     results = [r for batch_results in per_batch for r in batch_results]
 
@@ -156,9 +160,11 @@ async def _review(
         summary_only=scrub(summary_only, secret_values),
         rejected=scrub(rejected, secret_values),
         failed_agents=failed_agents,
+        skipped_budget=[fc.path for fc in over_budget],
         stats={
             "files": len(reviewable),
             "skipped": len(pr.skipped),
+            "skipped_budget": len(over_budget),
             "batches": len(batches),
             "agent_calls": len(results),
             "agent_errors": errors,

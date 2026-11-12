@@ -48,6 +48,8 @@ def format_text(result: ReviewResult) -> str:
         lines.append("")
     if result.partial:
         lines.append(f"⚠️  partial review: {', '.join(result.failed_agents)} failed after retries")
+    if result.skipped_budget:
+        lines.append(f"💰 over cost budget, not reviewed: {', '.join(result.skipped_budget)}")
     lines.append(f"stats: {result.stats}")
     lines.append(f"usage: {format_usage(result.usage)}")
     return "\n".join(lines) + "\n"

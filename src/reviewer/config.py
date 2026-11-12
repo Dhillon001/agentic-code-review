@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     # USD per million tokens, keyed by model name or prefix (longest match wins). Used for the
     # estimated cost in the usage footer; override as JSON, e.g. {"claude-opus": {"input": 5, "output": 25}}.
     model_prices: dict[str, ModelPrice] = Field(default_factory=lambda: dict(DEFAULT_PRICES))
+    # Cost budget per review (USD). Before any model call the specialists' input cost is estimated (chars/4
+    # tokens, priced with `model_prices`); files are dropped from the end of the list until it fits and are
+    # reported in `ReviewResult.skipped_budget`. Unset (or <= 0) = no budget. See reviewer/budget.py.
+    max_cost_usd: float | None = None
 
     # Pipeline behaviour
     verify: bool = True
@@ -130,6 +134,11 @@ class Settings(BaseSettings):
     embedding_chunk_lines: int = 40
     embedding_max_files: int = 500  # files indexed per review when the source can list them
     max_prompt_chars: int = 120_000  # per specialist call; files are batched to fit
+
+    @field_validator("max_cost_usd", mode="before")
+    @classmethod
+    def _max_cost(cls, v: object) -> object:
+        return None if isinstance(v, str) and not v.strip() else v  # `MAX_COST_USD=` means "no budget"
 
     @field_validator("agent_models", mode="before")
     @classmethod

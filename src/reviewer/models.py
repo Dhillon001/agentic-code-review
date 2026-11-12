@@ -141,6 +141,8 @@ class ReviewResult(BaseModel):
     stats: dict[str, int] = Field(default_factory=dict)
     # agents with at least one call that still failed after retries ("verifier" included): a partial review
     failed_agents: list[str] = Field(default_factory=list)
+    # files left unreviewed by the specialists because the estimated cost exceeded MAX_COST_USD (in the order dropped)
+    skipped_budget: list[str] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)  # tokens, estimated cost, and wall time for this review
 
     @property

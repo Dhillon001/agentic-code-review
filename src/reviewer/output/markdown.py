@@ -12,7 +12,12 @@ import re
 from collections import Counter, defaultdict
 
 from reviewer.models import Finding, ReviewResult
-from reviewer.output.github_review import ICON, partial_note, suggestion_block
+from reviewer.output.github_review import (
+    ICON,
+    budget_note,
+    partial_note,
+    suggestion_block,
+)
 from reviewer.usage import format_usage
 
 
@@ -44,6 +49,8 @@ def format_markdown(result: ReviewResult, title: str = "Agentic review") -> str:
     lines = [f"# 🤖 {title}", ""]
     if result.partial:
         lines += [f"> {partial_note(result)}", ""]
+    if result.skipped_budget:
+        lines += [f"> {budget_note(result)}", ""]
 
     if not posted:
         lines += ["✅ No issues survived verification.", ""]

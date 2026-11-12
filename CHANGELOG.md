@@ -45,6 +45,10 @@ All notable changes to this project are documented here. The format follows
   5xx, timeout, dropped connection), honouring `retry-after`; other errors fail fast. Agents that still fail are
   listed in `ReviewResult.failed_agents` and flagged as a "partial review" in the GitHub summary, Markdown and
   text reports; a failed verifier call holds that file's findings back. One failing agent never crashes a review.
+- **Cost budget** — `MAX_COST_USD` caps a review's estimated specialist input cost (chars/4 tokens, priced with
+  `MODEL_PRICES` per routed model, prompt-cache writes/reads included) before any model call. Files are dropped
+  from the end of the list until the estimate fits and reported as `ReviewResult.skipped_budget` (stat
+  `skipped_budget`) and in the GitHub summary, Markdown and text reports. The secret scan still covers them.
 
 ## [0.1.0] — 2026-10-31
 

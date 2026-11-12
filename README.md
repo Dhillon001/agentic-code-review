@@ -296,6 +296,7 @@ usage: 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s
 | Stat | Meaning |
 |---|---|
 | `files` / `skipped` | Files reviewed / files dropped as noise or ignored |
+| `skipped_budget` | Files the agents didn't review because the estimate exceeded `MAX_COST_USD` |
 | `batches` · `agent_calls` · `agent_errors` | How the work was split, and how many model calls failed (failures never sink the review) |
 | `raw_findings` → `candidates` → `confirmed` | The funnel: everything the agents said → after confidence floor + dedupe → after the verifier |
 | `already_commented` | Findings dropped because the bot already commented on that exact line in an earlier review |
@@ -312,6 +313,15 @@ tokens, with the cache hits in brackets, so you can see prompt caching pay off. 
 **estimate** from the `MODEL_PRICES` table (USD per million tokens, matched by model name or prefix; cache reads
 default to 0.1× and cache writes to 1.25× the input price). Calls to a model with no price are flagged as
 `unpriced` rather than silently counted as free.
+
+#### 💰 Cost budget
+
+Set `MAX_COST_USD` to cap what one review may spend. Before any model call, the specialists' input cost is
+estimated (characters ÷ 4 tokens per prompt, priced per routed model from `MODEL_PRICES`, with the shared prefix
+written to the prompt cache once and read by the other specialists). If the estimate is over budget, files are
+dropped from the end of the list until it fits; they're listed as `skipped_budget` in `--json`, counted in
+stats, and named in the GitHub summary (**💰 Cost budget: …**), Markdown and text reports. The free secret scan
+still runs on every file. Output tokens and verifier calls aren't part of the estimate, so leave some headroom.
 
 #### 👍 Feedback: which agents earn their keep?
 
@@ -354,6 +364,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `LLM_MAX_RETRIES` | `3` | Retries on transient errors (rate limit, overload, 5xx, timeout, dropped connection) |
 | `LLM_BACKOFF_BASE_S` / `LLM_BACKOFF_MAX_S` | `1` / `30` | Exponential backoff with full jitter between retries (a `retry-after` header is honoured up to the max) |
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
+| `MAX_COST_USD` | unset | Per-review cost budget: files that don't fit the estimated specialist cost are skipped and listed (see *Cost budget*) |
 | `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
 | `VERIFY` | `true` | Turn the verifier off (useful for evals) |
 | `LANGUAGE_HINTS` | `true` | Add a language-specific pitfalls checklist (by file extension) to specialist prompts |
@@ -596,6 +607,7 @@ src/reviewer/
 │   ├── verifier.py      # second-pass fact checker
 │   ├── resilience.py    # timeouts + retries with backoff/jitter around any LLM
 │   └── llm.py           # LLM protocol + Anthropic implementation
+├── budget.py            # MAX_COST_USD: pre-call cost estimate, drop files until it fits
 ├── pipeline.py          # orchestration: batch → fan out → dedupe → verify → rank → place
 ├── ranking.py           # dedupe · severity/cap ranking · snap-to-diff-line
 ├── secret_scan.py       # regex credential detectors on added lines · redaction
