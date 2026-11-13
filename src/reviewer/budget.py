@@ -9,8 +9,8 @@ instructions are plain input. Output tokens and verifier calls depend on what th
 estimated, so leave some headroom. Models with no entry in `MODEL_PRICES` count as free here (the usage footer
 still flags their calls as unpriced).
 
-Priority is the order of the file list: the last file goes first. Callers that want a smarter order (e.g. by
-risk) sort the list before calling `fit_budget`.
+Priority is the order of the file list: the last file goes first. The pipeline sorts by risk first
+(`reviewer.risk.by_risk`), so the lowest-risk files are the ones dropped.
 """
 
 from __future__ import annotations

@@ -18,6 +18,7 @@ from reviewer.models import PRContext, ReviewResult
 from reviewer.output.github_review import bot_commented_lines, post_review
 from reviewer.pipeline import review
 from reviewer.repo_config import apply_repo_config, load_repo_config
+from reviewer.risk import cap_files
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ async def context_from_github(
         settings = apply_repo_config(settings, await load_repo_config(GitHubSource(client, repo, base_sha)))
     source = GitHubSource(client, head_repo, head["sha"])
     diffs, skipped = split_noise(diffs, settings.ignore)
+    diffs, over_cap = cap_files(diffs, settings.max_files)
     ctx = PRContext(
         repo=repo,
         number=number,
@@ -63,6 +65,7 @@ async def context_from_github(
         since_sha=since_sha,
         files=await build_context(source, diffs, settings),
         skipped=skipped,
+        skipped_max_files=[d.path for d in over_cap],
     )
     return ctx, settings
 
@@ -74,11 +77,13 @@ async def context_from_local(
     source = LocalGitSource(repo, base, head)
     settings = apply_repo_config(settings, await load_repo_config(source))
     diffs, skipped = split_noise(parse_unified_diff(source.diff()), settings.ignore)
+    diffs, over_cap = cap_files(diffs, settings.max_files)
     ctx = PRContext(
         repo=str(source.repo),
         title=f"{head} vs {base}",
         files=await build_context(source, diffs, settings),
         skipped=skipped,
+        skipped_max_files=[d.path for d in over_cap],
     )
     return ctx, settings
 

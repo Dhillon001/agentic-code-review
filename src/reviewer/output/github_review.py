@@ -54,32 +54,53 @@ def partial_note(result: ReviewResult) -> str:
 MAX_LISTED_FILES = 20
 
 
+def _listed(paths: list[str]) -> str:
+    noun = "file" if len(paths) == 1 else "files"
+    return f"{len(paths)} {noun} not reviewed by the agents"
+
+
+def _names(paths: list[str]) -> str:
+    listed = ", ".join(f"`{p}`" for p in paths[:MAX_LISTED_FILES])
+    if len(paths) > MAX_LISTED_FILES:
+        listed += f" and {len(paths) - MAX_LISTED_FILES} more"
+    return listed
+
+
 def budget_note(result: ReviewResult) -> str:
     """One line naming the files the cost budget left unreviewed ("" when none were)."""
     paths = result.skipped_budget
     if not paths:
         return ""
-    noun = "file" if len(paths) == 1 else "files"
-    listed = ", ".join(f"`{p}`" for p in paths[:MAX_LISTED_FILES])
-    if len(paths) > MAX_LISTED_FILES:
-        listed += f" and {len(paths) - MAX_LISTED_FILES} more"
-    return f"💰 **Cost budget:** {len(paths)} {noun} not reviewed by the agents (`MAX_COST_USD`): {listed}"
+    return f"💰 **Cost budget:** {_listed(paths)} (`MAX_COST_USD`): {_names(paths)}"
+
+
+def max_files_note(result: ReviewResult) -> str:
+    """One line naming the lowest-risk files a large PR left unreviewed ("" when none were)."""
+    paths = result.skipped_max_files
+    if not paths:
+        return ""
+    return f"📚 **Large PR:** {_listed(paths)} (`MAX_FILES`, lowest risk first out): {_names(paths)}"
+
+
+def unreviewed_notes(result: ReviewResult) -> list[str]:
+    """The large-PR and cost-budget notes that apply, in that order."""
+    return [n for n in (max_files_note(result), budget_note(result)) if n]
 
 
 def format_summary(result: ReviewResult) -> str:
     posted = result.inline + result.summary_only
     usage = f"\n\n<sub>💸 {format_usage(result.usage)}</sub>" if result.usage.calls else ""
     partial = f"\n\n{partial_note(result)}" if result.partial else ""
-    budget = f"\n\n{budget_note(result)}" if result.skipped_budget else ""
+    notes = "".join(f"\n\n{n}" for n in unreviewed_notes(result))
     if not posted:
-        return "🤖 **Agentic review:** no issues found that survived verification." + partial + budget + usage
+        return "🤖 **Agentic review:** no issues found that survived verification." + partial + notes + usage
     counts = Counter(f.severity.value for f in posted)
     tally = " · ".join(f"{ICON[s]} {counts[s]} {s}" for s in ICON if counts[s])
     lines = [f"🤖 **Agentic review:** {tally}"]
     if result.partial:
         lines.append(f"\n{partial_note(result)}")
-    if result.skipped_budget:
-        lines.append(f"\n{budget_note(result)}")
+    for note in unreviewed_notes(result):
+        lines.append(f"\n{note}")
     if result.summary_only:
         lines.append("\n**Outside the diff:**")
         for f in result.summary_only:

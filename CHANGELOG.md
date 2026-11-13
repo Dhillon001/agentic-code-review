@@ -49,6 +49,11 @@ All notable changes to this project are documented here. The format follows
   `MODEL_PRICES` per routed model, prompt-cache writes/reads included) before any model call. Files are dropped
   from the end of the list until the estimate fits and reported as `ReviewResult.skipped_budget` (stat
   `skipped_budget`) and in the GitHub summary, Markdown and text reports. The secret scan still covers them.
+- **Risk-ranked files for large PRs** — when a PR exceeds `MAX_FILES` or the cost budget, files are ranked by a
+  deterministic risk score (security-sensitive paths like `auth`/`crypto`/`sql`/`session`, lines changed, new
+  files; test files last) and the lowest-risk ones are left out instead of whatever came last in the diff.
+  Files cut by `MAX_FILES` are reported as `ReviewResult.skipped_max_files` (stat `skipped_max_files`) and
+  listed in the GitHub summary ("Large PR"), Markdown and text reports.
 
 ## [0.1.0] — 2026-10-31
 

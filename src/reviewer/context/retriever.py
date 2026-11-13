@@ -16,6 +16,7 @@ from typing import Protocol
 from reviewer.config import Settings
 from reviewer.ingest.sources import Source
 from reviewer.models import FileContext, FileDiff, RelatedSnippet
+from reviewer.risk import cap_files
 
 # Fallback for languages without their own patterns (Python, Rust, Ruby, ...).
 SYMBOL_RE = re.compile(r"\b(?:def|class|function|func|fn|interface|struct|type)\s+([A-Za-z_]\w*)")
@@ -160,7 +161,10 @@ def make_retriever(settings: Settings) -> Retriever:
 async def build_context(
     source: Source, diffs: list[FileDiff], settings: Settings, retriever: Retriever | None = None
 ) -> list[FileContext]:
-    """`retriever` defaults to the one `settings.retriever` names; inject one to use a custom embedder."""
+    """`retriever` defaults to the one `settings.retriever` names; inject one to use a custom embedder.
+
+    At most `settings.max_files` reviewable files get context: past that, the lowest-risk ones are left out
+    (see `reviewer.risk.cap_files`; callers that report them call it first)."""
     retriever = retriever or make_retriever(settings)
     sem = asyncio.Semaphore(8)
 
@@ -172,7 +176,8 @@ async def build_context(
             related = await retriever.related(source, d, settings)
         return FileContext(diff=d, content=content, related=related)
 
-    return list(await asyncio.gather(*(one(d) for d in diffs[: settings.max_files])))
+    kept, _ = cap_files(diffs, settings.max_files)
+    return list(await asyncio.gather(*(one(d) for d in kept)))
 
 
 # ---------------------------------------------------------------- rendering helpers

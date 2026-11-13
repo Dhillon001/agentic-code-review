@@ -48,6 +48,8 @@ def format_text(result: ReviewResult) -> str:
         lines.append("")
     if result.partial:
         lines.append(f"⚠️  partial review: {', '.join(result.failed_agents)} failed after retries")
+    if result.skipped_max_files:
+        lines.append(f"📚 large PR (MAX_FILES), not reviewed: {', '.join(result.skipped_max_files)}")
     if result.skipped_budget:
         lines.append(f"💰 over cost budget, not reviewed: {', '.join(result.skipped_budget)}")
     lines.append(f"stats: {result.stats}")

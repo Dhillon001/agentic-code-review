@@ -296,6 +296,7 @@ usage: 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s
 | Stat | Meaning |
 |---|---|
 | `files` / `skipped` | Files reviewed / files dropped as noise or ignored |
+| `skipped_max_files` | Lowest-risk files the agents didn't review because the PR had more than `MAX_FILES` |
 | `skipped_budget` | Files the agents didn't review because the estimate exceeded `MAX_COST_USD` |
 | `batches` · `agent_calls` · `agent_errors` | How the work was split, and how many model calls failed (failures never sink the review) |
 | `raw_findings` → `candidates` → `confirmed` | The funnel: everything the agents said → after confidence floor + dedupe → after the verifier |
@@ -318,10 +319,21 @@ default to 0.1× and cache writes to 1.25× the input price). Calls to a model w
 
 Set `MAX_COST_USD` to cap what one review may spend. Before any model call, the specialists' input cost is
 estimated (characters ÷ 4 tokens per prompt, priced per routed model from `MODEL_PRICES`, with the shared prefix
-written to the prompt cache once and read by the other specialists). If the estimate is over budget, files are
-dropped from the end of the list until it fits; they're listed as `skipped_budget` in `--json`, counted in
-stats, and named in the GitHub summary (**💰 Cost budget: …**), Markdown and text reports. The free secret scan
-still runs on every file. Output tokens and verifier calls aren't part of the estimate, so leave some headroom.
+written to the prompt cache once and read by the other specialists). If the estimate is over budget, the
+lowest-risk files are dropped until it fits (see *Large PRs* below); they're listed as `skipped_budget` in
+`--json`, counted in stats, and named in the GitHub summary (**💰 Cost budget: …**), Markdown and text reports.
+The free secret scan still runs on every file. Output tokens and verifier calls aren't part of the estimate, so
+leave some headroom.
+
+#### 📚 Large PRs: riskiest files first
+
+When a PR has more reviewable files than `MAX_FILES`, or more than `MAX_COST_USD` pays for, the agents review
+the riskiest files and leave the rest out. The risk score is a cheap heuristic over the diff
+(`reviewer/risk.py`): security-sensitive paths (`auth`, `oauth`, `crypto`, `sql`, `session`, `token`,
+`permission`, `payment`, migrations, …) rank highest, then more changed lines (log scale), with a small boost for
+new files; test files always go last. Ties keep the diff order, and the files that are reviewed stay in diff
+order. Files left out over `MAX_FILES` are listed as `skipped_max_files` in `--json`, counted in stats, and
+named in the GitHub summary (**📚 Large PR: …**), Markdown and text reports.
 
 #### 👍 Feedback: which agents earn their keep?
 
@@ -376,7 +388,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `PATH_RULES` | `{}` | Glob → extra rules for matching files only (JSON object; `.acr.yml` `paths:` overrides per glob) |
 | `CUSTOM_AGENTS` | `[]` | Extra specialists, e.g. `[{"name": "docs", "focus": "…"}]` (`.acr.yml` `agents:` adds to / overrides by name) |
 | `DISABLE_AGENTS` | `[]` | Specialist names to switch off (JSON list; `.acr.yml` `disable:` adds to it) |
-| `MAX_FILES` | `50` | Max files reviewed per PR |
+| `MAX_FILES` | `50` | Max files reviewed per PR; past it the lowest-risk files are skipped and listed (see *Large PRs*) |
 | `FULL_FILE_MAX_LINES` | `400` | Send the whole file if it's shorter than this |
 | `CONTEXT_LINES` | `30` | Window size around hunks for longer files |
 | `MAX_RELATED_PER_FILE` | `3` | Related call-site snippets per file |
@@ -608,6 +620,7 @@ src/reviewer/
 │   ├── resilience.py    # timeouts + retries with backoff/jitter around any LLM
 │   └── llm.py           # LLM protocol + Anthropic implementation
 ├── budget.py            # MAX_COST_USD: pre-call cost estimate, drop files until it fits
+├── risk.py              # risk score per file: what large PRs / tight budgets review first
 ├── pipeline.py          # orchestration: batch → fan out → dedupe → verify → rank → place
 ├── ranking.py           # dedupe · severity/cap ranking · snap-to-diff-line
 ├── secret_scan.py       # regex credential detectors on added lines · redaction

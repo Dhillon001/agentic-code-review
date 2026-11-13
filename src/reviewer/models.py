@@ -100,6 +100,8 @@ class PRContext(BaseModel):
     since_sha: str | None = None  # incremental re-review: only hunks changed since this commit
     files: list[FileContext] = Field(default_factory=list)
     skipped: list[str] = Field(default_factory=list)  # paths dropped as noise or ignored before review
+    # lowest-risk files left out because the PR had more than `max_files` reviewable files (riskiest first)
+    skipped_max_files: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------- findings
@@ -143,6 +145,8 @@ class ReviewResult(BaseModel):
     failed_agents: list[str] = Field(default_factory=list)
     # files left unreviewed by the specialists because the estimated cost exceeded MAX_COST_USD (in the order dropped)
     skipped_budget: list[str] = Field(default_factory=list)
+    # lowest-risk files left out because the PR exceeded `max_files` (riskiest first; see reviewer/risk.py)
+    skipped_max_files: list[str] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)  # tokens, estimated cost, and wall time for this review
 
     @property

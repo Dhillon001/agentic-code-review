@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     # estimated cost in the usage footer; override as JSON, e.g. {"claude-opus": {"input": 5, "output": 25}}.
     model_prices: dict[str, ModelPrice] = Field(default_factory=lambda: dict(DEFAULT_PRICES))
     # Cost budget per review (USD). Before any model call the specialists' input cost is estimated (chars/4
-    # tokens, priced with `model_prices`); files are dropped from the end of the list until it fits and are
+    # tokens, priced with `model_prices`); the lowest-risk files are dropped until it fits and are
     # reported in `ReviewResult.skipped_budget`. Unset (or <= 0) = no budget. See reviewer/budget.py.
     max_cost_usd: float | None = None
 
@@ -124,7 +124,7 @@ class Settings(BaseSettings):
     disable_agents: list[str] = Field(default_factory=list)  # built-in or custom specialist names
 
     # Context building
-    max_files: int = 50
+    max_files: int = 50  # reviewable files per review; past it the lowest-risk are skipped (reviewer/risk.py)
     full_file_max_lines: int = 400  # send whole file if shorter, else windows around hunks
     context_lines: int = 30
     max_related_per_file: int = 3

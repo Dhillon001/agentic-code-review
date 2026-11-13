@@ -1,4 +1,4 @@
-"""Orchestration: secret pre-pass + cost budget + specialists x file-batches in parallel -> dedupe -> verify -> rank -> place."""
+"""Orchestration: secret pre-pass + risk-ranked cost budget + specialists x file-batches in parallel -> dedupe -> verify -> rank -> place."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from reviewer.budget import fit_budget
 from reviewer.config import Settings
 from reviewer.models import FileContext, Finding, PRContext, ReviewResult
 from reviewer.ranking import dedupe, place, rank
+from reviewer.risk import by_risk
 from reviewer.secret_scan import scan as scan_secrets
 from reviewer.secret_scan import scrub
 from reviewer.suppress import split_suppressed, suppressions_for
@@ -99,15 +100,20 @@ async def _review(
         specialists = build_specialists(settings)  # built-ins + .acr.yml `agents:` - `disable:`
     reviewable = [fc for fc in pr.files if fc.diff.status != "deleted" and fc.diff.hunks]
     if not reviewable:
-        return ReviewResult(stats={"files": 0, "skipped": len(pr.skipped)})
+        return ReviewResult(
+            skipped_max_files=list(pr.skipped_max_files), stats={"files": 0, "skipped": len(pr.skipped)}
+        )
 
     # deterministic pre-pass: no model call, and its hits skip the verifier
     secrets, secret_values = scan_secrets(reviewable) if settings.secret_scan else ([], set())
     deterministic = {id(f) for f in secrets}
 
     # cost budget: the specialists only see the files whose estimated cost fits (the secret scan and
-    # suppressions above/below still cover every file: they're free)
-    to_review, over_budget, _ = fit_budget(pr, reviewable, specialists, settings)
+    # suppressions above/below still cover every file: they're free). The lowest-risk files go first;
+    # the ones that fit are reviewed in their original order.
+    kept, over_budget, _ = fit_budget(pr, by_risk(reviewable, lambda fc: fc.diff), specialists, settings)
+    kept_ids = {id(fc) for fc in kept}
+    to_review = [fc for fc in reviewable if id(fc) in kept_ids]
     batches = batch_files(to_review, settings)
     per_batch = await asyncio.gather(*(_review_batch(llm, specialists, pr, b, settings) for b in batches))
     results = [r for batch_results in per_batch for r in batch_results]
@@ -161,10 +167,12 @@ async def _review(
         rejected=scrub(rejected, secret_values),
         failed_agents=failed_agents,
         skipped_budget=[fc.path for fc in over_budget],
+        skipped_max_files=list(pr.skipped_max_files),
         stats={
             "files": len(reviewable),
             "skipped": len(pr.skipped),
             "skipped_budget": len(over_budget),
+            "skipped_max_files": len(pr.skipped_max_files),
             "batches": len(batches),
             "agent_calls": len(results),
             "agent_errors": errors,
