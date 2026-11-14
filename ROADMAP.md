@@ -58,7 +58,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Fri Nov 13
 
-- [ ] **Review a patch file.** `acr diff PATCH|- [--root DIR]` reviews any unified diff from a file or stdin,
+- [x] **Review a patch file.** `acr diff PATCH|- [--root DIR]` reviews any unified diff from a file or stdin,
   reading file contents from `--root` (default: cwd). Works without git or GitHub.
 
 ## Sat Nov 14

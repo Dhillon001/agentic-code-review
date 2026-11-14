@@ -1,4 +1,7 @@
-"""Unified-diff parser (works on `git diff` output and GitHub's .diff media type)."""
+"""Unified-diff parser: `git diff`/`git format-patch` output, GitHub's .diff media type, and plain
+`diff -u` / `diff -ru` output (files introduced by `---`/`+++` headers without a `diff --git` line)."""
+
+from __future__ import annotations
 
 import re
 
@@ -7,18 +10,56 @@ from reviewer.models import FileDiff, Hunk
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 
+def _header_path(raw: str) -> str:
+    """Path from a `--- `/`+++ ` header: drop a `diff -u` timestamp (after a tab) and the a/ b/ prefix."""
+    p = raw[4:].split("\t", 1)[0].strip()
+    if p.startswith('"') and p.endswith('"') and len(p) >= 2:
+        p = p[1:-1]
+    return p[2:] if p.startswith(("a/", "b/")) else p
+
+
 def parse_unified_diff(text: str) -> list[FileDiff]:
     files: list[FileDiff] = []
     cur: FileDiff | None = None
     hunk: Hunk | None = None
     new_line = 0
+    old_left = new_left = 0  # lines the current hunk header promised; the hunk ends when both reach 0
 
-    for raw in text.splitlines():
+    lines = text.splitlines()
+    for i, raw in enumerate(lines):
         if raw.startswith("diff --git "):
             rest = raw[len("diff --git ") :]
             a, _, b = rest.partition(" b/")
             old = a[2:] if a.startswith("a/") else a
             cur = FileDiff(path=b or old, old_path=old)
+            files.append(cur)
+            hunk = None
+            continue
+
+        # Once a hunk has all the lines its header promised, trailer text (a `diff -ru` "Only in" line,
+        # a format-patch "-- " signature, its trailing space possibly stripped) ends it. Lines that still look like diff lines are kept, so a
+        # hand-edited patch with an under-counted header doesn't lose its last lines.
+        done = hunk is not None and old_left <= 0 and new_left <= 0
+        if done and (raw.rstrip() == "--" or not raw.startswith((" ", "+", "-", "\\"))):
+            hunk = None
+            done = False
+
+        # Plain `diff -u` file header: `--- old` immediately followed by `+++ new`, outside any hunk. A
+        # `diff --git` file that has no hunks yet is still reading its own headers, so it isn't one.
+        if (
+            (hunk is None or done)
+            and raw.startswith("--- ")
+            and i + 1 < len(lines)
+            and lines[i + 1].startswith("+++ ")
+            and (cur is None or cur.hunks)
+        ):
+            old, new = _header_path(raw), _header_path(lines[i + 1])
+            if old == "/dev/null":
+                cur = FileDiff(path=new, status="added")
+            elif new == "/dev/null":
+                cur = FileDiff(path=old, old_path=old, status="deleted")
+            else:
+                cur = FileDiff(path=new, old_path=old)
             files.append(cur)
             hunk = None
             continue
@@ -38,9 +79,9 @@ def parse_unified_diff(text: str) -> list[FileDiff]:
                 cur.status = "renamed"
                 continue
             if raw.startswith("+++ "):
-                p = raw[4:].strip()
+                p = _header_path(raw)
                 if p != "/dev/null":
-                    cur.path = p[2:] if p.startswith("b/") else p
+                    cur.path = p
                 continue
             if raw.startswith("--- "):
                 continue
@@ -51,6 +92,8 @@ def parse_unified_diff(text: str) -> list[FileDiff]:
         m = HUNK_RE.match(raw)
         if m:
             new_line = int(m.group(3))
+            old_left = int(m.group(2)) if m.group(2) is not None else 1
+            new_left = int(m.group(4)) if m.group(4) is not None else 1
             hunk = Hunk(header=raw, new_start=new_line)
             cur.hunks.append(hunk)
             continue
@@ -61,11 +104,16 @@ def parse_unified_diff(text: str) -> list[FileDiff]:
         if raw.startswith("+"):
             hunk.added_lines.append(new_line)
             new_line += 1
-        elif raw.startswith("-") or raw.startswith("\\"):
+            new_left -= 1
+        elif raw.startswith("-"):
+            old_left -= 1
+        elif raw.startswith("\\"):
             pass
         else:  # context (some tools strip the leading space on blank lines)
             hunk.context_lines.append(new_line)
             new_line += 1
+            old_left -= 1
+            new_left -= 1
 
     return files
 

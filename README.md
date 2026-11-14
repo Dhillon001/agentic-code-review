@@ -96,7 +96,7 @@ flowchart TD
 
 ### Stage 1 — Ingest 📥
 
-The unified diff (from GitHub or `git diff`) is parsed into files and hunks with **new-file line numbers**,
+The unified diff (from GitHub, `git diff`, or any patch file — `git format-patch`, plain `diff -u`) is parsed into files and hunks with **new-file line numbers**,
 so every finding can point at an exact line. Before anything else happens, files that aren't worth reviewing
 are dropped:
 
@@ -273,11 +273,13 @@ pytest -q                     # runs fully offline — no API key needed
 |---|---|
 | `acr local --base main` | Review your current branch against `main` |
 | `acr local --repo ../other --base develop --head feature-x` | Review any local repo / refs |
+| `acr diff change.patch --root ~/src/app` | Review any unified diff (`git diff`, `git format-patch`, `diff -ru`, an emailed patch) — no git or GitHub needed. File contents come from `--root` (default: cwd), which should hold the **post-change** files; `-` reads the diff from stdin |
+| `git diff HEAD~3 \| acr diff -` | …e.g. review an arbitrary commit range, or `hg diff \| acr diff -` for a Mercurial checkout |
 | `acr pr owner/repo 123` | Review a GitHub PR and print the results |
 | `acr pr owner/repo 123 --post` | …and post it as a real PR review |
 | `acr pr owner/repo 123 --since <sha>` | Incremental: only review hunks changed since `<sha>` |
 | `acr feedback owner/repo --days 30` | How useful were the bot's comments? 👍/👎 precision per agent and category |
-| `acr local --fail-on high` | CI gate: exit **1** if any posted finding is `high` or worse, **2** if the review itself fails, **0** otherwise (also on `acr pr`) |
+| `acr local --fail-on high` | CI gate: exit **1** if any posted finding is `high` or worse, **2** if the review itself fails, **0** otherwise (also on `acr pr` and `acr diff`) |
 | `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
 | `acr local --format markdown --out review.md` | Markdown report grouped by file (severity icons, ```` ```suggestion ```` blocks, stats + usage footer); `--format text\|json\|markdown\|sarif`, `--json` = `--format json`, `--out` writes to a file instead of stdout (`pr` too) |
 | `acr pr owner/repo 123 --format sarif --out acr.sarif` | SARIF 2.1.0 for GitHub code scanning: one rule per category, `error`/`warning`/`note` from severity, line-stable fingerprints, one-line fixes |
@@ -460,7 +462,8 @@ models:                    # per-specialist model; unlisted agents use REVIEWER_
 <summary><b>How <code>.acr.yml</code> is handled (security & edge cases)</b></summary>
 
 - **For GitHub PRs it's read from the base branch**, so a PR can't switch off or loosen its own review.
-  `acr local` is trusted and reads it from the head ref, so you can try changes by committing them.
+  `acr local` is trusted and reads it from the head ref, so you can try changes by committing them; `acr diff`
+  reads it from `--root`.
 - `rules` may also be a YAML list of strings. Violations are reported with category `team-rule`. Rules are
   capped at 4,000 characters so they can't eat the prompt budget.
 - `paths` rules are injected only into the prompts of file batches that contain a matching file (and into the
@@ -621,7 +624,7 @@ src/reviewer/
 │   ├── diff.py          # unified-diff parser → files, hunks, new-file line numbers, binary flag
 │   ├── noise.py         # NOISE_PATTERNS + split_noise(): what never gets reviewed
 │   ├── github.py        # async GitHub REST client
-│   └── sources.py       # GitHubSource · LocalGitSource · InMemorySource (read / search files)
+│   └── sources.py       # GitHubSource · LocalGitSource · FilesystemSource · InMemorySource (read / search files)
 ├── context/
 │   ├── retriever.py     # per-file context · Retriever protocol · lexical call-site retriever
 │   └── embedding.py     # EmbeddingRetriever: chunk → embed (pluggable) → cosine top-k

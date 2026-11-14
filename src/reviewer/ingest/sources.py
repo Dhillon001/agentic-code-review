@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -62,6 +63,70 @@ class LocalGitSource:
     async def list_files(self) -> list[str]:
         out = await asyncio.to_thread(self._git, "ls-tree", "-r", "--name-only", self.head)
         return [p for p in out.splitlines() if p]
+
+
+class FilesystemSource:
+    """Read files straight from a directory — no git or GitHub. Used by `acr diff`, where the patch is
+    assumed to be applied already (the directory holds the post-change files).
+
+    Paths come from a patch that may be untrusted, so anything resolving outside `root` reads as missing."""
+
+    SKIP_DIRS = frozenset({".git", ".hg", ".svn", "node_modules", "__pycache__", ".venv", "venv", ".tox",
+                           ".mypy_cache", ".pytest_cache", "dist", "build"})
+    MAX_BYTES = 1_000_000  # search/list skip bigger files: generated data, not code worth context
+
+    def __init__(self, root: str | Path = "."):
+        self.root = Path(root).resolve()
+
+    def _resolve(self, path: str) -> Path | None:
+        target = (self.root / path).resolve()
+        return target if target.is_relative_to(self.root) and target.is_file() else None
+
+    def _read(self, path: str) -> str | None:
+        target = self._resolve(path)
+        if target is None:
+            return None
+        try:
+            data = target.read_bytes()
+        except OSError:
+            return None
+        if b"\0" in data[:8192]:  # binary
+            return None
+        return data.decode("utf-8", errors="replace")
+
+    def _walk(self) -> list[str]:
+        out: list[str] = []
+        for dirpath, dirnames, filenames in os.walk(self.root):
+            dirnames[:] = sorted(d for d in dirnames if d not in self.SKIP_DIRS)
+            for name in sorted(filenames):
+                full = Path(dirpath) / name
+                try:
+                    if full.is_symlink() or full.stat().st_size > self.MAX_BYTES:
+                        continue
+                except OSError:
+                    continue
+                out.append(full.relative_to(self.root).as_posix())
+        return out
+
+    def _search(self, symbol: str, limit: int) -> list[str]:
+        pat = re.compile(rf"\b{re.escape(symbol)}\b")
+        hits: list[str] = []
+        for rel in self._walk():
+            text = self._read(rel)
+            if text is not None and pat.search(text):
+                hits.append(rel)
+                if len(hits) >= limit:
+                    break
+        return hits
+
+    async def read_file(self, path: str) -> str | None:
+        return await asyncio.to_thread(self._read, path)
+
+    async def search(self, symbol: str, limit: int = 5) -> list[str]:
+        return await asyncio.to_thread(self._search, symbol, limit)
+
+    async def list_files(self) -> list[str]:
+        return await asyncio.to_thread(self._walk)
 
 
 class InMemorySource:

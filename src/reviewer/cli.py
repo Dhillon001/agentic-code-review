@@ -2,9 +2,10 @@
 acr pr owner/repo 123 [--post] [--since SHA]
                                             review a GitHub PR (optionally post; --since = only new commits)
 acr local [--repo .] [--base main]          review your current branch against a base
+acr diff PATCH|- [--root DIR]               review any unified diff (file or stdin); contents read from --root
 acr feedback owner/repo [--days 30]         👍/👎 precision of the bot's comments, per agent and category
 
-`pr` and `local` accept `--fail-on SEVERITY` for CI: exit 1 if any posted finding is at or above it,
+`pr`, `local` and `diff` accept `--fail-on SEVERITY` for CI: exit 1 if any posted finding is at or above it,
 exit 2 if the review itself fails, 0 otherwise (see reviewer/gate.py). They also accept
 `--format {text,json,markdown,sarif}` (`--json` is an alias for `--format json`) and `--out PATH` to write
 the report to a file instead of stdout. `sarif` is SARIF 2.1.0 for GitHub code scanning upload.
@@ -26,7 +27,7 @@ from reviewer.models import ReviewResult
 from reviewer.output.github_review import ICON
 from reviewer.output.markdown import format_markdown
 from reviewer.output.sarif import format_sarif
-from reviewer.service import feedback_report, review_github_pr, review_local
+from reviewer.service import feedback_report, review_github_pr, review_local, review_patch
 from reviewer.usage import format_usage
 
 
@@ -93,6 +94,14 @@ def _add_fail_on(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _read_patch(arg: str) -> tuple[str, str]:
+    """(patch text, report title). Invalid bytes are replaced rather than failing the whole review."""
+    if arg == "-":
+        return sys.stdin.buffer.read().decode("utf-8", errors="replace"), "patch from stdin"
+    with open(arg, "rb") as fh:
+        return fh.read().decode("utf-8", errors="replace"), f"patch {arg}"
+
+
 def main() -> None:
     sys.exit(run())
 
@@ -118,6 +127,14 @@ def run(argv: list[str] | None = None) -> int:
     _add_output(lo)
     _add_fail_on(lo)
 
+    df = sub.add_parser("diff", help="review a unified diff from a file or stdin (no git or GitHub needed)")
+    df.add_argument("patch", metavar="PATCH", help="unified diff file, or - for stdin")
+    df.add_argument(
+        "--root", default=".", help="directory holding the post-change files (default: current directory)"
+    )
+    _add_output(df)
+    _add_fail_on(df)
+
     fb = sub.add_parser("feedback", help="precision of posted comments from 👍/👎 reactions")
     fb.add_argument("repo", help="owner/repo")
     fb.add_argument("--days", type=int, default=30, help="look back this many days (0 = all time)")
@@ -126,7 +143,7 @@ def run(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
 
-    if args.cmd in ("pr", "local"):
+    if args.cmd in ("pr", "local", "diff"):
         if args.json and args.format not in (None, "json"):
             p.error(f"--json conflicts with --format {args.format}")
         args.format = "json" if args.json else (args.format or "text")
@@ -145,6 +162,9 @@ def run(argv: list[str] | None = None) -> int:
             result = asyncio.run(
                 review_github_pr(args.repo, args.number, settings, post=args.post, since_sha=args.since or None)
             )
+        elif args.cmd == "diff":
+            patch, title = _read_patch(args.patch)
+            result = asyncio.run(review_patch(patch, args.root, settings, title=title))
         else:
             result = asyncio.run(review_local(args.repo, args.base, args.head, settings))
     except SystemExit as e:  # e.g. missing API key: a broken review must never look like "found bugs" (1)

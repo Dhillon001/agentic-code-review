@@ -14,8 +14,8 @@ from reviewer.feedback import FeedbackReport, fetch_feedback
 from reviewer.ingest.diff import parse_unified_diff, restrict_to_changes
 from reviewer.ingest.github import GitHubClient
 from reviewer.ingest.noise import split_noise
-from reviewer.ingest.sources import GitHubSource, LocalGitSource
-from reviewer.models import PRContext, ReviewResult
+from reviewer.ingest.sources import FilesystemSource, GitHubSource, LocalGitSource
+from reviewer.models import FileContext, PRContext, ReviewResult
 from reviewer.output.github_review import bot_commented_lines, post_review
 from reviewer.pipeline import review
 from reviewer.repo_config import apply_repo_config, load_repo_config
@@ -91,6 +91,47 @@ async def context_from_local(
     return ctx, settings
 
 
+async def context_from_patch(
+    patch: str, root: str | Path, settings: Settings, title: str = "patch"
+) -> tuple[PRContext, Settings]:
+    """Context for any unified diff, with file contents read from `root` (the patch already applied).
+    `.acr.yml` is read from `root` too: like local runs, this is the user's own trusted checkout."""
+    source = FilesystemSource(root)
+    settings = apply_repo_config(settings, await load_repo_config(source))
+    diffs, skipped = split_noise(parse_unified_diff(patch), settings.ignore)
+    diffs, over_cap = cap_files(diffs, settings.max_files)
+    files = await build_context(source, diffs, settings)
+    stale = [fc.diff.path for fc in files if fc.diff.hunks and fc.diff.status != "deleted" and not _applied(fc)]
+    if stale:
+        log.warning(
+            "%s under %s do not match the patch's added lines (missing, or patch not applied?): %s",
+            "file" if len(stale) == 1 else "files", source.root, ", ".join(stale),
+        )
+    ctx = PRContext(
+        repo=str(source.root),
+        title=title,
+        files=files,
+        skipped=skipped,
+        skipped_max_files=[d.path for d in over_cap],
+    )
+    return ctx, settings
+
+
+def _applied(fc: FileContext) -> bool:
+    """Does the file on disk carry the patch's added lines where the patch says they go?"""
+    if fc.content is None:
+        return False
+    on_disk = fc.content.splitlines()
+    for h in fc.diff.hunks:
+        added = iter(h.added_lines)
+        for raw in h.lines:
+            if raw.startswith("+"):
+                n = next(added)
+                if n > len(on_disk) or on_disk[n - 1].rstrip("\r") != raw[1:].rstrip("\r"):
+                    return False
+    return True
+
+
 async def review_github_pr(
     repo: str, number: int, settings: Settings, post: bool = False, since_sha: str | None = None
 ) -> ReviewResult:
@@ -108,6 +149,11 @@ async def review_github_pr(
 
 async def review_local(repo: str | Path, base: str, head: str, settings: Settings) -> ReviewResult:
     pr, settings = await context_from_local(repo, base, head, settings)
+    return await review(pr, make_llm(settings), settings)
+
+
+async def review_patch(patch: str, root: str | Path, settings: Settings, title: str = "patch") -> ReviewResult:
+    pr, settings = await context_from_patch(patch, root, settings, title)
     return await review(pr, make_llm(settings), settings)
 
 

@@ -59,6 +59,12 @@ All notable changes to this project are documented here. The format follows
   unchanged prompts are free and reproducible (`run_evals.py --cache-dir` too). `cache_control` markers don't
   affect the key, errors are never cached, corrupt entries are misses, and writes are atomic. Hits are reported
   as `usage.response_cache_hits` and in the usage footer (`2 calls + 10 from response cache`).
+- **Review a patch file** — `acr diff PATCH|- [--root DIR]` reviews any unified diff from a file or stdin, with
+  file contents read from `--root` (default: cwd, the patch already applied) — no git or GitHub needed. The
+  parser now also reads plain `diff -u`/`diff -ruN` output and stops a hunk at trailer text (`Only in …`,
+  format-patch `-- ` signatures). Paths escaping `--root` read as missing, `.acr.yml` is read from `--root`, and a
+  warning names files whose contents don't match the patch's added lines. `--format`, `--out`, `--fail-on` and
+  `--cache-dir` work as on `local`.
 
 ## [0.1.0] — 2026-10-31
 
