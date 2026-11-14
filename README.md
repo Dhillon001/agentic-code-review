@@ -281,6 +281,7 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
 | `acr local --format markdown --out review.md` | Markdown report grouped by file (severity icons, ```` ```suggestion ```` blocks, stats + usage footer); `--format text\|json\|markdown\|sarif`, `--json` = `--format json`, `--out` writes to a file instead of stdout (`pr` too) |
 | `acr pr owner/repo 123 --format sarif --out acr.sarif` | SARIF 2.1.0 for GitHub code scanning: one rule per category, `error`/`warning`/`note` from severity, line-stable fingerprints, one-line fixes |
+| `acr local --cache-dir .acr-cache` | Answer repeated identical model calls from an on-disk response cache (also `LLM_CACHE_DIR`; `pr` too) — see *Response cache* |
 | `acr -v ...` | Verbose logging |
 | `acr --version` | Print the installed version |
 
@@ -314,6 +315,16 @@ tokens, with the cache hits in brackets, so you can see prompt caching pay off. 
 **estimate** from the `MODEL_PRICES` table (USD per million tokens, matched by model name or prefix; cache reads
 default to 0.1× and cache writes to 1.25× the input price). Calls to a model with no price are flagged as
 `unpriced` rather than silently counted as free.
+
+#### 🗃️ Response cache
+
+`--cache-dir DIR` (or `LLM_CACHE_DIR=DIR`) wraps the model in a `CachingLLM` that keys each call by a SHA-256 of
+(model, system prompt, user content, tool schema) and stores the tool output as a JSON file under `DIR`. Rerun
+the same review or eval with unchanged prompts and every call is answered from disk: no tokens, no cost, and
+the exact same findings — so eval comparisons are reproducible. Any change to a prompt, model, rule, or the code
+under review is a different key, so stale answers are never reused for a different question. Errors are never
+cached (the next run tries again), and hits appear in the usage footer (`0 calls + 5 from response cache · …`)
+and as `response_cache_hits` in `--json`. Delete the directory to start fresh.
 
 #### 💰 Cost budget
 
@@ -375,6 +386,7 @@ category is the place to raise the confidence floor or tighten the prompt.
 | `LLM_TIMEOUT_S` | `180` | Per-attempt timeout for one model call (`0` = none) |
 | `LLM_MAX_RETRIES` | `3` | Retries on transient errors (rate limit, overload, 5xx, timeout, dropped connection) |
 | `LLM_BACKOFF_BASE_S` / `LLM_BACKOFF_MAX_S` | `1` / `30` | Exponential backoff with full jitter between retries (a `retry-after` header is honoured up to the max) |
+| `LLM_CACHE_DIR` | unset | On-disk response cache for identical model calls (`--cache-dir`); errors are never cached |
 | `CACHE_WARMUP` | `true` | Run one specialist per batch before the others so they hit the prompt cache |
 | `MAX_COST_USD` | unset | Per-review cost budget: files that don't fit the estimated specialist cost are skipped and listed (see *Cost budget*) |
 | `MODEL_PRICES` | Opus 5/25 · Sonnet 3/15 · Haiku 1/5 | JSON price table for cost estimates, e.g. `{"claude-opus": {"input": 5, "output": 25}}` (USD per MTok; optional `cache_read` / `cache_write`) |
@@ -565,6 +577,7 @@ plus **clean** PRs where the right answer is *silence*.
 python evals/run_evals.py               # precision · recall · F1 across all cases
 python evals/run_evals.py --no-verify   # same, verifier off: shows what it's worth
 python evals/run_evals.py --only sql-injection
+python evals/run_evals.py --cache-dir .acr-cache   # reruns of unchanged cases are free and identical
 ```
 
 | Case | What it checks |
@@ -618,6 +631,7 @@ src/reviewer/
 │   ├── languages.py     # extension → language pitfalls table (language hints)
 │   ├── verifier.py      # second-pass fact checker
 │   ├── resilience.py    # timeouts + retries with backoff/jitter around any LLM
+│   ├── cache.py         # on-disk response cache (CachingLLM) for reruns
 │   └── llm.py           # LLM protocol + Anthropic implementation
 ├── budget.py            # MAX_COST_USD: pre-call cost estimate, drop files until it fits
 ├── risk.py              # risk score per file: what large PRs / tight budgets review first

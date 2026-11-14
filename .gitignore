@@ -6,3 +6,4 @@ __pycache__/
 dist/
 *.egg-info/
 evals/report.json
+.acr-cache/

@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = 3
     llm_backoff_base_s: float = 1.0
     llm_backoff_max_s: float = 30.0
+    # On-disk response cache (agents/cache.py): identical calls are answered from JSON files in this directory,
+    # making eval reruns free and reproducible. Unset = no cache. CLI: `--cache-dir`.
+    llm_cache_dir: str | None = None
     # Run one specialist per batch before the rest so the shared-context prompt cache is written
     # once and read by the others (parallel cold calls would each pay the full input price).
     cache_warmup: bool = True
@@ -134,6 +137,11 @@ class Settings(BaseSettings):
     embedding_chunk_lines: int = 40
     embedding_max_files: int = 500  # files indexed per review when the source can list them
     max_prompt_chars: int = 120_000  # per specialist call; files are batched to fit
+
+    @field_validator("llm_cache_dir", mode="before")
+    @classmethod
+    def _cache_dir(cls, v: object) -> object:
+        return None if isinstance(v, str) and not v.strip() else v  # `LLM_CACHE_DIR=` means "no cache"
 
     @field_validator("max_cost_usd", mode="before")
     @classmethod

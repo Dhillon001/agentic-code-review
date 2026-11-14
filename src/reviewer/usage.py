@@ -24,6 +24,7 @@ class CallUsage(BaseModel):
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     latency_s: float = 0.0
+    response_cached: bool = False  # served from the on-disk response cache (agents/cache.py): no tokens spent
 
 
 class ModelPrice(BaseModel):
@@ -71,9 +72,14 @@ class Usage(BaseModel):
     cache_write_tokens: int = 0
     est_usd: float = 0.0
     unpriced_calls: int = 0
+    response_cache_hits: int = 0  # calls answered from the response cache; not counted in `calls`
     model_time_s: float = 0.0  # sum of per-call latencies (exceeds wall time when calls overlap)
     wall_time_s: float = 0.0
     by_model: dict[str, CallUsage] = Field(default_factory=dict)
+
+    @property
+    def any_calls(self) -> bool:
+        return bool(self.calls or self.response_cache_hits)
 
     @property
     def total_input_tokens(self) -> int:
@@ -81,9 +87,13 @@ class Usage(BaseModel):
 
 
 def summarize(calls: list[CallUsage], prices: dict[str, ModelPrice], wall_time_s: float = 0.0) -> Usage:
-    u = Usage(calls=len(calls), wall_time_s=round(wall_time_s, 3))
+    u = Usage(wall_time_s=round(wall_time_s, 3))
     cost = 0.0
     for c in calls:
+        if c.response_cached:
+            u.response_cache_hits += 1
+            continue
+        u.calls += 1
         u.input_tokens += c.input_tokens
         u.output_tokens += c.output_tokens
         u.cache_read_tokens += c.cache_read_tokens
@@ -110,8 +120,13 @@ def _k(n: int) -> str:
 
 
 def format_usage(u: Usage) -> str:
-    """One line, e.g. `12 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s`."""
-    parts = [f"{u.calls} call{'s' if u.calls != 1 else ''}"]
+    """One line, e.g. `12 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s`.
+
+    Response-cache hits are appended to the call count: `2 calls + 10 from response cache · …`."""
+    calls = f"{u.calls} call{'s' if u.calls != 1 else ''}"
+    if u.response_cache_hits:
+        calls += f" + {u.response_cache_hits} from response cache"
+    parts = [calls]
     tokens_in = f"{_k(u.total_input_tokens)} in"
     if u.cache_read_tokens:
         tokens_in += f" ({_k(u.cache_read_tokens)} cached)"

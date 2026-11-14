@@ -8,6 +8,7 @@ acr feedback owner/repo [--days 30]         👍/👎 precision of the bot's com
 exit 2 if the review itself fails, 0 otherwise (see reviewer/gate.py). They also accept
 `--format {text,json,markdown,sarif}` (`--json` is an alias for `--format json`) and `--out PATH` to write
 the report to a file instead of stdout. `sarif` is SARIF 2.1.0 for GitHub code scanning upload.
+`--cache-dir DIR` (or `LLM_CACHE_DIR`) answers repeated identical model calls from an on-disk cache.
 """
 
 from __future__ import annotations
@@ -75,6 +76,11 @@ def _add_output(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--format", choices=FORMATS, default=None, help="report format (default: text)")
     parser.add_argument("--json", action="store_true", help="alias for --format json")
     parser.add_argument("--out", metavar="PATH", help="write the report to PATH instead of stdout")
+    parser.add_argument(
+        "--cache-dir",
+        metavar="DIR",
+        help="reuse model responses for identical calls from DIR (default: LLM_CACHE_DIR; never caches errors)",
+    )
 
 
 def _add_fail_on(parser: argparse.ArgumentParser) -> None:
@@ -126,6 +132,8 @@ def run(argv: list[str] | None = None) -> int:
         args.format = "json" if args.json else (args.format or "text")
 
     settings = get_settings()
+    if getattr(args, "cache_dir", None):
+        settings = settings.model_copy(update={"llm_cache_dir": args.cache_dir})
 
     if args.cmd == "feedback":
         report = asyncio.run(feedback_report(args.repo, settings, args.days))

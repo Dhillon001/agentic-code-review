@@ -54,6 +54,11 @@ All notable changes to this project are documented here. The format follows
   files; test files last) and the lowest-risk ones are left out instead of whatever came last in the diff.
   Files cut by `MAX_FILES` are reported as `ReviewResult.skipped_max_files` (stat `skipped_max_files`) and
   listed in the GitHub summary ("Large PR"), Markdown and text reports.
+- **Response cache** — `--cache-dir DIR` / `LLM_CACHE_DIR` wraps the model in a `CachingLLM` keyed by a SHA-256
+  of (model, system, user content, tool schema) that stores tool outputs as JSON, so eval and review reruns with
+  unchanged prompts are free and reproducible (`run_evals.py --cache-dir` too). `cache_control` markers don't
+  affect the key, errors are never cached, corrupt entries are misses, and writes are atomic. Hits are reported
+  as `usage.response_cache_hits` and in the usage footer (`2 calls + 10 from response cache`).
 
 ## [0.1.0] — 2026-10-31
 

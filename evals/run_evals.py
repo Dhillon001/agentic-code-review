@@ -8,7 +8,10 @@ Each case lives in evals/cases/<id>/:
 A finding matches an expected bug if it's in the same file within ±LINE_TOLERANCE lines.
 Clean cases measure false positives — that's the number that decides whether people mute the bot.
 
-    python evals/run_evals.py [--no-verify] [--only sql-injection]
+    python evals/run_evals.py [--no-verify] [--only sql-injection] [--cache-dir .acr-cache]
+
+With `--cache-dir` (or `LLM_CACHE_DIR`) model responses are cached on disk, so rerunning unchanged cases
+costs nothing and gives identical results.
 """
 
 from __future__ import annotations
@@ -59,6 +62,9 @@ async def run_case(d: Path, llm, settings) -> dict:
         "case": d.name, **s,
         "findings": [f"{f.file}:{f.line} [{f.severity.value}/{f.category}] {f.title}" for f in found],
         "rejected_by_verifier": len(result.rejected),
+        "calls": result.usage.calls,
+        "response_cache_hits": result.usage.response_cache_hits,
+        "est_usd": result.usage.est_usd,
     }
 
 
@@ -66,9 +72,13 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-verify", action="store_true", help="measure the verifier's value by turning it off")
     ap.add_argument("--only")
+    ap.add_argument("--cache-dir", help="cache model responses here (default: LLM_CACHE_DIR)")
     args = ap.parse_args()
 
-    settings = get_settings().model_copy(update={"verify": not args.no_verify})
+    update: dict = {"verify": not args.no_verify}
+    if args.cache_dir:
+        update["llm_cache_dir"] = args.cache_dir
+    settings = get_settings().model_copy(update=update)
     llm = make_llm(settings)
     dirs = sorted(p for p in CASES.iterdir() if p.is_dir() and (not args.only or p.name == args.only))
     rows = await asyncio.gather(*(run_case(d, llm, settings) for d in dirs))
@@ -84,6 +94,10 @@ async def main() -> None:
         for line in r["findings"]:
             print(f"     {line}")
     print(f"\nprecision={precision:.2f} recall={recall:.2f} f1={f1:.2f}  verify={settings.verify}")
+    if settings.llm_cache_dir:
+        hits = sum(r["response_cache_hits"] for r in rows)
+        calls = sum(r["calls"] for r in rows)
+        print(f"model calls={calls}  response cache hits={hits}  ~${sum(r['est_usd'] for r in rows):.2f}")
 
     report = {"precision": precision, "recall": recall, "f1": f1, "verify": settings.verify, "cases": rows}
     (Path(__file__).parent / "report.json").write_text(json.dumps(report, indent=2))

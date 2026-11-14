@@ -170,7 +170,7 @@ def build_sarif(result: ReviewResult) -> dict[str, Any]:
         "results": [_result(f, index[rule_id(f.category)], off) for f, off in posted],
         "properties": {"stats": dict(result.stats)},
     }
-    if result.usage.calls:
+    if result.usage.any_calls:
         run["properties"]["usage"] = result.usage.model_dump(mode="json")
     return {"$schema": SARIF_SCHEMA, "version": SARIF_VERSION, "runs": [run]}
 

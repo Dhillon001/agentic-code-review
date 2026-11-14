@@ -52,7 +52,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Thu Nov 12
 
-- [ ] **Response cache.** `--cache-dir` / `LLM_CACHE_DIR`: a `CachingLLM` wrapper keyed by a hash of
+- [x] **Response cache.** `--cache-dir` / `LLM_CACHE_DIR`: a `CachingLLM` wrapper keyed by a hash of
   (model, system, user, tool schema) stores tool outputs as JSON, making eval reruns free and reproducible.
   Cache hits are reported in usage. Never caches errors.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from reviewer.agents.cache import CachingLLM
 from reviewer.agents.llm import LLM, AnthropicLLM
 from reviewer.agents.resilience import ResilientLLM
 from reviewer.config import Settings
@@ -28,7 +29,9 @@ def make_llm(settings: Settings) -> LLM:
         raise SystemExit("ANTHROPIC_API_KEY is not set")
     # The wrapper owns retries and the concurrency limit; the SDK client does neither.
     inner = AnthropicLLM(settings.anthropic_api_key, concurrency=None, max_retries=0)
-    return ResilientLLM(inner, settings.retry_policy(), concurrency=settings.llm_concurrency)
+    llm: LLM = ResilientLLM(inner, settings.retry_policy(), concurrency=settings.llm_concurrency)
+    # The response cache sits outermost so a hit skips the concurrency limit and the retry loop.
+    return CachingLLM(llm, settings.llm_cache_dir) if settings.llm_cache_dir else llm
 
 
 async def context_from_github(

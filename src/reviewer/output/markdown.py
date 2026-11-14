@@ -81,6 +81,6 @@ def format_markdown(result: ReviewResult, title: str = "Agentic review") -> str:
     if s.get("suppressed"):
         funnel += f" · {s['suppressed']} suppressed"
     lines.append(f"<sub>{funnel}</sub>")
-    if result.usage.calls:
+    if result.usage.any_calls:
         lines += ["", f"<sub>💸 {format_usage(result.usage)}</sub>"]
     return "\n".join(lines) + "\n"

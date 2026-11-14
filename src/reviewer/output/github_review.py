@@ -89,7 +89,7 @@ def unreviewed_notes(result: ReviewResult) -> list[str]:
 
 def format_summary(result: ReviewResult) -> str:
     posted = result.inline + result.summary_only
-    usage = f"\n\n<sub>💸 {format_usage(result.usage)}</sub>" if result.usage.calls else ""
+    usage = f"\n\n<sub>💸 {format_usage(result.usage)}</sub>" if result.usage.any_calls else ""
     partial = f"\n\n{partial_note(result)}" if result.partial else ""
     notes = "".join(f"\n\n{n}" for n in unreviewed_notes(result))
     if not posted:
