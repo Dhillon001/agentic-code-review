@@ -65,6 +65,10 @@ All notable changes to this project are documented here. The format follows
   format-patch `-- ` signatures). Paths escaping `--root` read as missing, `.acr.yml` is read from `--root`, and a
   warning names files whose contents don't match the patch's added lines. `--format`, `--out`, `--fail-on` and
   `--cache-dir` work as on `local`.
+- **Pre-commit integration** — `acr staged [--repo DIR]` reviews exactly what `git commit` would record
+  (`git diff --cached`, file contents and `.acr.yml` read from the index, so unstaged edits are ignored; works
+  before the first commit and from any subdirectory). A repo-level `.pre-commit-hooks.yaml` ships an `acr` hook
+  (`acr staged --fail-on high`). With nothing reviewable staged it exits 0 without a model call or API key.
 
 ## [0.1.0] — 2026-10-31
 

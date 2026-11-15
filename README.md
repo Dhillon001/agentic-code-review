@@ -275,11 +275,12 @@ pytest -q                     # runs fully offline — no API key needed
 | `acr local --repo ../other --base develop --head feature-x` | Review any local repo / refs |
 | `acr diff change.patch --root ~/src/app` | Review any unified diff (`git diff`, `git format-patch`, `diff -ru`, an emailed patch) — no git or GitHub needed. File contents come from `--root` (default: cwd), which should hold the **post-change** files; `-` reads the diff from stdin |
 | `git diff HEAD~3 \| acr diff -` | …e.g. review an arbitrary commit range, or `hg diff \| acr diff -` for a Mercurial checkout |
+| `acr staged` | Review what `git commit` would record: the staged diff, with contents read from the index (unstaged edits ignored) — see *Pre-commit hook* below |
 | `acr pr owner/repo 123` | Review a GitHub PR and print the results |
 | `acr pr owner/repo 123 --post` | …and post it as a real PR review |
 | `acr pr owner/repo 123 --since <sha>` | Incremental: only review hunks changed since `<sha>` |
 | `acr feedback owner/repo --days 30` | How useful were the bot's comments? 👍/👎 precision per agent and category |
-| `acr local --fail-on high` | CI gate: exit **1** if any posted finding is `high` or worse, **2** if the review itself fails, **0** otherwise (also on `acr pr` and `acr diff`) |
+| `acr local --fail-on high` | CI gate: exit **1** if any posted finding is `high` or worse, **2** if the review itself fails, **0** otherwise (also on `acr pr`, `acr diff` and `acr staged`) |
 | `acr ... --json` | Full machine-readable `ReviewResult` (or `FeedbackReport` for `feedback`) |
 | `acr local --format markdown --out review.md` | Markdown report grouped by file (severity icons, ```` ```suggestion ```` blocks, stats + usage footer); `--format text\|json\|markdown\|sarif`, `--json` = `--format json`, `--out` writes to a file instead of stdout (`pr` too) |
 | `acr pr owner/repo 123 --format sarif --out acr.sarif` | SARIF 2.1.0 for GitHub code scanning: one rule per category, `error`/`warning`/`note` from severity, line-stable fingerprints, one-line fixes |
@@ -307,6 +308,26 @@ usage: 6 calls · 48.2k in (31.0k cached) · 3.4k out · ~$0.21 · 38.4s
 | `secrets` | Hardcoded credentials found by the regex pre-pass (posted as `critical`, never sent to the verifier) |
 | `suppressed` | Findings silenced by an `acr: ignore` comment in the code (see below) |
 | `rejected` · `posted` | Killed by the verifier · actually posted after ranking and the cap |
+
+#### 🪝 Pre-commit hook
+
+Review every commit before it's made with [pre-commit](https://pre-commit.com) (3.2+). Add to
+`.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/Dhillon001/agentic-code-review
+    rev: v0.2.0  # or a commit SHA
+    hooks:
+      - id: acr                      # runs `acr staged --fail-on high`
+        # args: [--fail-on, critical]  # override: args are appended, last --fail-on wins
+```
+
+then `pre-commit install`. The hook reviews the staged diff only and blocks the commit (exit 1) when a verified
+finding is `high` or worse; a failed review (e.g. `ANTHROPIC_API_KEY` unset) exits 2 and also blocks it, so
+export the key in your shell. Commits with nothing reviewable staged (only deletions, lockfiles, …) pass
+without a model call. Skip it once with `SKIP=acr git commit …` or `git commit --no-verify`. Add
+`--cache-dir .acr-cache` to `args` to make re-running on an unchanged index free.
 
 #### 💸 Usage: tokens, cost, latency
 
@@ -462,8 +483,8 @@ models:                    # per-specialist model; unlisted agents use REVIEWER_
 <summary><b>How <code>.acr.yml</code> is handled (security & edge cases)</b></summary>
 
 - **For GitHub PRs it's read from the base branch**, so a PR can't switch off or loosen its own review.
-  `acr local` is trusted and reads it from the head ref, so you can try changes by committing them; `acr diff`
-  reads it from `--root`.
+  `acr local` is trusted and reads it from the head ref, so you can try changes by committing them; `acr staged`
+  reads it from the index (stage it to try changes); `acr diff` reads it from `--root`.
 - `rules` may also be a YAML list of strings. Violations are reported with category `team-rule`. Rules are
   capped at 4,000 characters so they can't eat the prompt budget.
 - `paths` rules are injected only into the prompts of file batches that contain a matching file (and into the

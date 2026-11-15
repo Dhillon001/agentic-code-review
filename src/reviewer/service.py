@@ -14,7 +14,7 @@ from reviewer.feedback import FeedbackReport, fetch_feedback
 from reviewer.ingest.diff import parse_unified_diff, restrict_to_changes
 from reviewer.ingest.github import GitHubClient
 from reviewer.ingest.noise import split_noise
-from reviewer.ingest.sources import FilesystemSource, GitHubSource, LocalGitSource
+from reviewer.ingest.sources import FilesystemSource, GitHubSource, LocalGitSource, StagedGitSource
 from reviewer.models import FileContext, PRContext, ReviewResult
 from reviewer.output.github_review import bot_commented_lines, post_review
 from reviewer.pipeline import review
@@ -91,6 +91,23 @@ async def context_from_local(
     return ctx, settings
 
 
+async def context_from_staged(repo: str | Path, settings: Settings) -> tuple[PRContext, Settings]:
+    """Context for what `git commit` would record. `.acr.yml` is read from the index (stage it to try
+    changes); like local runs, this is the user's own trusted checkout."""
+    source = StagedGitSource(repo)
+    settings = apply_repo_config(settings, await load_repo_config(source))
+    diffs, skipped = split_noise(parse_unified_diff(source.diff()), settings.ignore)
+    diffs, over_cap = cap_files(diffs, settings.max_files)
+    ctx = PRContext(
+        repo=str(source.repo),
+        title="staged changes",
+        files=await build_context(source, diffs, settings),
+        skipped=skipped,
+        skipped_max_files=[d.path for d in over_cap],
+    )
+    return ctx, settings
+
+
 async def context_from_patch(
     patch: str, root: str | Path, settings: Settings, title: str = "patch"
 ) -> tuple[PRContext, Settings]:
@@ -150,6 +167,20 @@ async def review_github_pr(
 async def review_local(repo: str | Path, base: str, head: str, settings: Settings) -> ReviewResult:
     pr, settings = await context_from_local(repo, base, head, settings)
     return await review(pr, make_llm(settings), settings)
+
+
+async def review_staged(repo: str | Path, settings: Settings) -> ReviewResult:
+    pr, settings = await context_from_staged(repo, settings)
+    if not any(fc.diff.status != "deleted" and fc.diff.hunks for fc in pr.files):
+        # Nothing to review (empty index, only deletions or noise): a commit hook must not need an API
+        # key or spend a model call to say so. The pipeline makes no call in this case either.
+        return await review(pr, _NoCallLLM(), settings)
+    return await review(pr, make_llm(settings), settings)
+
+
+class _NoCallLLM:
+    async def call_tool(self, **kwargs):  # pragma: no cover - the pipeline never calls it without files
+        raise RuntimeError("no model call expected: nothing to review")
 
 
 async def review_patch(patch: str, root: str | Path, settings: Settings, title: str = "patch") -> ReviewResult:

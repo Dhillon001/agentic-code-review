@@ -1,0 +1,9 @@
+- id: acr
+  name: agentic code review (staged changes)
+  description: Review staged changes with specialist agents + verifier; block the commit on high/critical findings.
+  entry: acr staged --fail-on high
+  language: python
+  pass_filenames: false
+  require_serial: true
+  stages: [pre-commit]
+  minimum_pre_commit_version: "3.2.0"

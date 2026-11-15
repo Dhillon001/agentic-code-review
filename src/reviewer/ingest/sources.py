@@ -65,6 +65,45 @@ class LocalGitSource:
         return [p for p in out.splitlines() if p]
 
 
+class StagedGitSource:
+    """What `git commit` would record: the staged diff (`git diff --cached`) with file contents read from
+    the index, not the working tree, so unstaged edits never leak into the review. Used by `acr staged`
+    and the pre-commit hook. Works before the first commit (the diff is then against the empty tree)."""
+
+    def __init__(self, repo: str | Path = "."):
+        top = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False
+        )
+        if top.returncode != 0:
+            raise ValueError(f"not a git repository: {repo} ({top.stderr.strip()})")
+        # Diff paths are relative to the top level, and so are index reads, wherever --repo points.
+        self.repo = Path(top.stdout.strip()).resolve()
+
+    def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(self.repo), "-c", "core.quotepath=off", *args],
+            capture_output=True, text=True, check=False,
+        )
+
+    def diff(self) -> str:
+        out = self._run("diff", "--cached", "--no-color", "--no-ext-diff", "-U3")
+        if out.returncode != 0:
+            raise RuntimeError(f"git diff --cached failed: {out.stderr.strip()}")
+        return out.stdout
+
+    async def read_file(self, path: str) -> str | None:
+        out = await asyncio.to_thread(self._run, "show", f":{path}")
+        return out.stdout if out.returncode == 0 and out.stdout else None
+
+    async def search(self, symbol: str, limit: int = 5) -> list[str]:
+        out = await asyncio.to_thread(self._run, "grep", "--cached", "-l", "-w", "-F", "-e", symbol)
+        return [p for p in out.stdout.splitlines() if p][:limit]
+
+    async def list_files(self) -> list[str]:
+        out = await asyncio.to_thread(self._run, "ls-files", "--cached")
+        return [p for p in out.stdout.splitlines() if p]
+
+
 class FilesystemSource:
     """Read files straight from a directory — no git or GitHub. Used by `acr diff`, where the patch is
     assumed to be applied already (the directory holds the post-change files).
