@@ -65,7 +65,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 - [x] **Pre-commit integration.** `acr staged` reviews `git diff --cached`; ship `.pre-commit-hooks.yaml` with
   an `acr` hook (`--fail-on high`) and README instructions.
-- [ ] **Eval breakdown + baseline.** `run_evals.py` reports precision/recall per category and writes
+- [x] **Eval breakdown + baseline.** `run_evals.py` reports precision/recall per category and writes
   `--report-md`; `--baseline report.json` prints deltas and exits 1 if F1 drops by more than `--tolerance`.
 
 ## Sun Nov 15

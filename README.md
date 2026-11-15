@@ -602,7 +602,15 @@ python evals/run_evals.py               # precision · recall · F1 across all c
 python evals/run_evals.py --no-verify   # same, verifier off: shows what it's worth
 python evals/run_evals.py --only sql-injection
 python evals/run_evals.py --cache-dir .acr-cache   # reruns of unchanged cases are free and identical
+python evals/run_evals.py --report-md eval.md      # also write a Markdown report
+cp evals/report.json baseline.json                 # save a baseline, change prompts, then:
+python evals/run_evals.py --baseline baseline.json --tolerance 0.02   # exit 1 if F1 drops > 0.02
 ```
+
+Scores are also broken down **per category**: recall counts the expected bugs labelled with a category,
+precision counts the findings the reviewer filed under it (a hit filed under the wrong category still counts
+overall, but shows up in that category's numbers). `--baseline` prints overall and per-category deltas
+against an earlier `report.json` — a cheap regression gate for prompt or model changes.
 
 | Case | What it checks |
 |---|---|

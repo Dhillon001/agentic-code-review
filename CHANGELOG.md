@@ -69,6 +69,10 @@ All notable changes to this project are documented here. The format follows
   (`git diff --cached`, file contents and `.acr.yml` read from the index, so unstaged edits are ignored; works
   before the first commit and from any subdirectory). A repo-level `.pre-commit-hooks.yaml` ships an `acr` hook
   (`acr staged --fail-on high`). With nothing reviewable staged it exits 0 without a model call or API key.
+- **Eval breakdown + baseline** — `evals/run_evals.py` now reports precision/recall/F1 per category (recall by
+  the expected label's category, precision by the category the reviewer chose), stores them in `report.json`,
+  and writes a Markdown report with `--report-md PATH`. `--baseline report.json` prints overall and per-category
+  deltas and exits 1 when F1 drops by more than `--tolerance` (default 0.02).
 
 ## [0.1.0] — 2026-10-31
 
