@@ -42,3 +42,10 @@ def test_diff_matches_post_change_files(case_dir):
                 if raw.startswith("+"):
                     n = next(added)
                     assert src[n - 1] == raw[1:], f"{fd.path}:{n} differs from change.diff"
+
+
+@pytest.mark.parametrize("case_dir", CASE_DIRS, ids=lambda d: d.name)
+def test_no_unfinished_scaffolded_cases(case_dir):
+    meta, _, _ = load_case(case_dir)
+    assert "_todo" not in meta, "delete the _todo note left by evals/new_case.py once expected is filled in"
+    assert all(e["category"] != "TODO" for e in meta["expected"]), "replace the TODO placeholder in expected"

@@ -631,10 +631,20 @@ cached responses make every run identical.
 | `clean-refactor` | Says **nothing** on a harmless change (false-positive guard) |
 | `clean-any-refactor` | Says **nothing** on a loop rewritten as `any()` |
 
-A finding counts as a hit if it's in the right file within ±3 lines. To add a case, create
-`evals/cases/<name>/` with `case.json` (title + expected findings), `change.diff`, and `files/` (the
-post-change sources). `pytest` checks that every case loads, that its diff matches `files/`, and that
-each expected line is one GitHub would accept an inline comment on.
+A finding counts as a hit if it's in the right file within ±3 lines. A case is `evals/cases/<name>/` with
+`case.json` (title + expected findings), `change.diff`, and `files/` (the post-change sources). The quickest
+way to add one is from a real commit:
+
+```bash
+python evals/new_case.py --repo ../my-service --commit 3f2a9c1 --name missing-auth-check
+#   --title "..." overrides the commit subject; --include PATH (repeatable) adds context files
+```
+
+It writes the commit's diff, the post-change files, and a `case.json` stub listing each file's commentable
+lines; replace its `TODO` entry with the real `{file, line, category}` bugs (or `[]` for a clean case) and
+delete `_todo`. It never overwrites an existing case. `pytest` checks that every case loads, that its diff
+matches `files/`, that each expected line is one GitHub would accept an inline comment on, and that no `TODO`
+placeholder is left.
 
 ---
 
@@ -690,7 +700,7 @@ src/reviewer/
 ├── server.py            # FastAPI webhook
 ├── config.py            # Settings (env / .env)
 └── models.py            # pydantic models: FileDiff, Finding, ReviewResult, …
-evals/                   # labelled cases + precision/recall scorer
+evals/                   # labelled cases, precision/recall scorer, case scaffolder
 tests/                   # offline tests with FakeLLM
 deploy/                  # GitHub Action workflow
 ```

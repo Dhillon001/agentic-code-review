@@ -72,7 +72,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 - [x] **Eval variance.** `run_evals.py --repeat N` runs each case N times and reports mean ± std for precision,
   recall and F1, plus per-case flakiness (cases whose outcome changed across runs).
-- [ ] **Eval case scaffolder.** `evals/new_case.py --repo PATH --commit SHA --name NAME` builds a case directory
+- [x] **Eval case scaffolder.** `evals/new_case.py --repo PATH --commit SHA --name NAME` builds a case directory
   from a local commit (diff + post-change files) with an `expected` stub to fill in; refuses to overwrite.
 
 ## Mon Nov 16

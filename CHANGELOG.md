@@ -77,6 +77,12 @@ All notable changes to this project are documented here. The format follows
   precision, recall and F1 plus flaky cases (outcome changed across runs) in the console, `report.json`
   (`variance`) and the Markdown report. Headline metrics become the per-run means, so `--baseline` compares
   means; counts and per-category scores pool all runs.
+- **Eval case scaffolder** — `python evals/new_case.py --repo PATH --commit SHA --name NAME [--title T]
+  [--include PATH]` builds `evals/cases/NAME/` from a local commit: its diff against the parent (empty tree for a
+  root commit, renames kept, binary/non-UTF-8 files dropped), the post-change files plus any `--include` context,
+  and a `case.json` with the commit subject, source SHA, a `TODO` expected entry, and each file's commentable
+  lines. It refuses merge commits, invalid names, and existing directories; `pytest` fails until the `TODO` is
+  replaced.
 
 ## [0.1.0] — 2026-10-31
 
