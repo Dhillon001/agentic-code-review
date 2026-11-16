@@ -605,12 +605,19 @@ python evals/run_evals.py --cache-dir .acr-cache   # reruns of unchanged cases a
 python evals/run_evals.py --report-md eval.md      # also write a Markdown report
 cp evals/report.json baseline.json                 # save a baseline, change prompts, then:
 python evals/run_evals.py --baseline baseline.json --tolerance 0.02   # exit 1 if F1 drops > 0.02
+python evals/run_evals.py --repeat 5               # mean ± std over 5 runs, plus flaky cases
 ```
 
 Scores are also broken down **per category**: recall counts the expected bugs labelled with a category,
 precision counts the findings the reviewer filed under it (a hit filed under the wrong category still counts
 overall, but shows up in that category's numbers). `--baseline` prints overall and per-category deltas
 against an earlier `report.json` — a cheap regression gate for prompt or model changes.
+
+Model output varies from run to run, so a single F1 can move by chance. `--repeat N` runs every case N times
+and reports **mean ± std** (sample) of precision, recall and F1, plus **flaky cases** — those whose
+tp/fp/fn outcome changed between runs. The report's headline metrics become the means (so `--baseline`
+compares means), and the Markdown report gains a variance table. Don't combine it with `--cache-dir`:
+cached responses make every run identical.
 
 | Case | What it checks |
 |---|---|

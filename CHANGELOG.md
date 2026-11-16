@@ -73,6 +73,10 @@ All notable changes to this project are documented here. The format follows
   the expected label's category, precision by the category the reviewer chose), stores them in `report.json`,
   and writes a Markdown report with `--report-md PATH`. `--baseline report.json` prints overall and per-category
   deltas and exits 1 when F1 drops by more than `--tolerance` (default 0.02).
+- **Eval variance** — `run_evals.py --repeat N` runs every case N times and reports mean ± sample std of
+  precision, recall and F1 plus flaky cases (outcome changed across runs) in the console, `report.json`
+  (`variance`) and the Markdown report. Headline metrics become the per-run means, so `--baseline` compares
+  means; counts and per-category scores pool all runs.
 
 ## [0.1.0] — 2026-10-31
 
