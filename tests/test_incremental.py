@@ -145,6 +145,11 @@ class FakeGitHub:
         if path == "/repos/o/r/pulls/7/reviews":
             self.posted.append(json.loads(req.content))
             return httpx.Response(200, json={"id": 1})
+        if path == "/repos/o/r/issues/7/comments":
+            if req.method == "POST":
+                self.posted.append(json.loads(req.content))
+                return httpx.Response(201, json={"id": 2})
+            return httpx.Response(200, json=[])
         if path == "/repos/o/r/contents/app/a.py":
             return httpx.Response(200, text=A_FILE)
         if path == "/repos/o/r/contents/app/b.py":
@@ -193,8 +198,9 @@ async def test_rereview_posts_only_new_findings(settings, monkeypatch):
     llm = FakeLLM({"correctness": [_finding("app/a.py", 42), _finding("app/b.py", 1, category="other")]})
     _patch_service(monkeypatch, gh, llm)
     await service.review_github_pr("o/r", 7, settings, post=True)
-    [posted] = gh.posted
+    posted, summary = gh.posted
     assert [(c["path"], c["line"]) for c in posted["comments"]] == [("app/b.py", 1)]
+    assert "<!-- acr:summary -->" in summary["body"]
 
 
 async def test_incremental_with_nothing_new_stays_silent(settings, monkeypatch):

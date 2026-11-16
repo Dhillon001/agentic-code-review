@@ -83,6 +83,30 @@ class GitHubClient:
                 break
         return out
 
+    async def list_issue_comments(self, repo: str, number: int, max_pages: int = 10) -> list[dict]:
+        """All conversation (issue) comments on a PR, oldest first."""
+        out: list[dict] = []
+        for page in range(1, max_pages + 1):
+            r = await self._http.get(
+                f"/repos/{repo}/issues/{number}/comments", params={"per_page": 100, "page": page}
+            )
+            r.raise_for_status()
+            batch = r.json()
+            out.extend(batch)
+            if len(batch) < 100:
+                break
+        return out
+
+    async def create_issue_comment(self, repo: str, number: int, body: str) -> dict:
+        r = await self._http.post(f"/repos/{repo}/issues/{number}/comments", json={"body": body})
+        r.raise_for_status()
+        return r.json()
+
+    async def update_issue_comment(self, repo: str, comment_id: int, body: str) -> dict:
+        r = await self._http.patch(f"/repos/{repo}/issues/comments/{comment_id}", json={"body": body})
+        r.raise_for_status()
+        return r.json()
+
     async def get_file(self, repo: str, path: str, ref: str) -> str | None:
         r = await self._http.get(
             f"/repos/{repo}/contents/{path}",

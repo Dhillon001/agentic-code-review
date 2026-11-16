@@ -233,7 +233,7 @@ cited line — and the comment carries a GitHub ` ```suggestion ` block the auth
 Multi-line replacements, and findings that were *snapped* to a nearby line, fall back to a prose
 **Suggested fix:** so a click can never overwrite the wrong line.
 
-…and the summary review shows a severity tally plus the funnel, so you can see the filtering at work:
+…and a single **summary comment** shows a severity tally plus the funnel, so you can see the filtering at work:
 
 > 🤖 **Agentic review:** 🔴 1 high · 🟠 1 medium
 >
@@ -251,6 +251,9 @@ When new commits land on a PR, the reviewer doesn't start from scratch:
 - **No repeated comments.** Before verifying, findings on a `(file, line)` the bot already has a live comment on
   are dropped (recognised by the `agent: …` footer), so you never see the same remark twice.
 - **Quiet when there's nothing new.** An incremental pass that finds nothing posts nothing.
+- **One summary, kept current.** The summary is a PR conversation comment carrying a hidden
+  `<!-- acr:summary -->` marker; each re-review edits it in place (with the head SHA it describes) instead of
+  stacking a new summary per push. Inline findings still arrive as a review, posted only when there are some.
 
 ---
 

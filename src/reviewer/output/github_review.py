@@ -9,6 +9,7 @@ from reviewer.usage import format_usage
 
 ICON = {"critical": "🛑", "high": "🔴", "medium": "🟠", "low": "🟡"}
 FOOTER = "<sub>agent: "  # every comment we post carries this; it's how we recognise our own comments
+SUMMARY_MARKER = "<!-- acr:summary -->"  # hidden; marks the one summary comment we keep editing
 
 
 def bot_commented_lines(comments: list[dict]) -> set[tuple[str, int]]:
@@ -113,10 +114,40 @@ def format_summary(result: ReviewResult) -> str:
     return "\n".join(lines) + usage
 
 
+def find_summary_comment(comments: list[dict]) -> dict | None:
+    """The most recent issue comment carrying the summary marker (None if this PR has none yet)."""
+    marked = [c for c in comments if SUMMARY_MARKER in (c.get("body") or "")]
+    return marked[-1] if marked else None
+
+
+def summary_body(result: ReviewResult, head_sha: str) -> str:
+    """The summary comment: hidden marker, the summary itself, and which head it describes."""
+    return f"{SUMMARY_MARKER}\n{format_summary(result)}\n\n<sub>🔁 Last reviewed at `{head_sha[:7]}`</sub>"
+
+
+def review_body(result: ReviewResult) -> str:
+    """Short body for the review that carries the inline comments (the details live in the summary)."""
+    n = len(result.inline)
+    return f"🤖 **Agentic review:** {n} inline comment{'s' if n != 1 else ''} — see the summary comment for details."
+
+
 async def post_review(client: GitHubClient, pr: PRContext, result: ReviewResult) -> dict:
+    """Post inline findings as a review, then create or edit-in-place the single summary comment.
+
+    The summary is an issue comment marked with `SUMMARY_MARKER`, so re-reviews update it instead of
+    stacking a new summary per push. A review is only created when there are inline comments."""
     if pr.number is None or not pr.head_sha:
         raise ValueError("PRContext needs number and head_sha to post a review")
     comments = [
         {"path": f.file, "line": f.line, "side": "RIGHT", "body": format_comment(f)} for f in result.inline
     ]
-    return await client.post_review(pr.repo, pr.number, pr.head_sha, format_summary(result), comments)
+    review = None
+    if comments:
+        review = await client.post_review(pr.repo, pr.number, pr.head_sha, review_body(result), comments)
+    body = summary_body(result, pr.head_sha)
+    existing = find_summary_comment(await client.list_issue_comments(pr.repo, pr.number))
+    if existing is not None:
+        summary = await client.update_issue_comment(pr.repo, existing["id"], body)
+    else:
+        summary = await client.create_issue_comment(pr.repo, pr.number, body)
+    return {"review": review, "summary": summary}

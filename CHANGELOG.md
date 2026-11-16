@@ -83,6 +83,9 @@ All notable changes to this project are documented here. The format follows
   and a `case.json` with the commit subject, source SHA, a `TODO` expected entry, and each file's commentable
   lines. It refuses merge commits, invalid names, and existing directories; `pytest` fails until the `TODO` is
   replaced.
+- **Updatable summary comment** — the review summary is now an issue comment carrying a hidden
+  `<!-- acr:summary -->` marker and the head SHA it describes; re-reviews edit it in place instead of stacking a
+  new summary per push. Inline findings are posted as a review only when there are some.
 
 ## [0.1.0] — 2026-10-31
 

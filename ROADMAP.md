@@ -77,7 +77,7 @@ the step. Update README/CHANGELOG `[Unreleased]` where a step adds user-facing b
 
 ## Mon Nov 16
 
-- [ ] **Updatable summary comment.** The summary is posted as an issue comment carrying a hidden
+- [x] **Updatable summary comment.** The summary is posted as an issue comment carrying a hidden
   `<!-- acr:summary -->` marker; re-reviews edit it in place instead of stacking new summaries.
 - [ ] **Webhook hardening.** Deduplicate deliveries by `X-GitHub-Delivery`; per-PR latest-wins locking so a new
   push cancels an in-flight review of an older head; `/healthz` reports queue depth.
