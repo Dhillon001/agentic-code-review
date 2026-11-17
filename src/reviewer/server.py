@@ -7,11 +7,12 @@ import hmac
 import json
 import logging
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 
 from reviewer.config import get_settings
 from reviewer.service import review_github_pr
 from reviewer.usage import format_usage
+from reviewer.webhook_queue import ReviewQueue
 
 log = logging.getLogger(__name__)
 app = FastAPI(title="Agentic Code Review")
@@ -32,17 +33,21 @@ async def _run(repo: str, number: int, since_sha: str | None = None) -> None:
         log.exception("review failed for %s#%s", repo, number)
 
 
+# Looked up at call time so tests can swap `_run`. One process, one queue: run a single worker.
+queue = ReviewQueue(lambda repo, number, since: _run(repo, number, since))
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
-    return {"ok": True}
+    return {"ok": True, "queue_depth": queue.depth}
 
 
 @app.post("/webhook")
 async def webhook(
     request: Request,
-    background: BackgroundTasks,
     x_github_event: str = Header(default=""),
     x_hub_signature_256: str | None = Header(default=None),
+    x_github_delivery: str | None = Header(default=None),
 ) -> dict:
     settings = get_settings()
     if not settings.github_webhook_secret:
@@ -50,6 +55,9 @@ async def webhook(
     body = await request.body()
     if not signature_ok(settings.github_webhook_secret, body, x_hub_signature_256):
         raise HTTPException(401, "bad signature")
+    # GitHub redelivers on timeouts and on manual "Redeliver": the same delivery id is handled once.
+    if queue.is_duplicate(x_github_delivery):
+        return {"duplicate": x_github_delivery}
 
     if x_github_event != "pull_request":
         return {"ignored": f"event {x_github_event}"}
@@ -60,5 +68,7 @@ async def webhook(
 
     # On a push, `before` is the previous head: review only what the new commits touched.
     since = payload.get("before") if payload.get("action") == "synchronize" else None
-    background.add_task(_run, payload["repository"]["full_name"], pr["number"], since)
+    # Latest wins: a newer push cancels an in-flight review of this PR's older head.
+    queue.submit(payload["repository"]["full_name"], pr["number"], since)
+    queue.mark_delivered(x_github_delivery)
     return {"queued": True}

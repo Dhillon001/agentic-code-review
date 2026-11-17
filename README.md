@@ -583,9 +583,11 @@ docker run -p 8000:8000 --env-file .env acr
 Then add a GitHub webhook:
 **Pull requests** events · JSON · secret = `GITHUB_WEBHOOK_SECRET` · URL = `https://<host>/webhook`.
 
-Signatures are checked with HMAC-SHA256, pushes (`synchronize`) are reviewed incrementally, reviews run
-in the background, and `/healthz` is there for your
-load balancer.
+Signatures are checked with HMAC-SHA256, pushes (`synchronize`) are reviewed incrementally, and reviews run
+in the background. Redeliveries (same `X-GitHub-Delivery`) are handled once, and a new push cancels an
+in-flight review of the PR's older head — the replacement still covers the commits that review never posted
+about. `/healthz` returns `{"ok": true, "queue_depth": N}` for your load balancer. Job state lives in the
+process, so run a single worker.
 
 </td>
 </tr>
@@ -701,6 +703,7 @@ src/reviewer/
 ├── service.py           # shared entry points for CLI / server / Action
 ├── cli.py               # `acr`
 ├── server.py            # FastAPI webhook
+├── webhook_queue.py     # webhook delivery dedupe + per-PR latest-wins review jobs
 ├── config.py            # Settings (env / .env)
 └── models.py            # pydantic models: FileDiff, Finding, ReviewResult, …
 evals/                   # labelled cases, precision/recall scorer, case scaffolder

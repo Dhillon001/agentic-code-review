@@ -86,6 +86,11 @@ All notable changes to this project are documented here. The format follows
 - **Updatable summary comment** — the review summary is now an issue comment carrying a hidden
   `<!-- acr:summary -->` marker and the head SHA it describes; re-reviews edit it in place instead of stacking a
   new summary per push. Inline findings are posted as a review only when there are some.
+- **Webhook hardening** — deliveries are deduplicated by `X-GitHub-Delivery` (GitHub retries and manual
+  redeliveries are answered `{"duplicate": …}`; only signed, queued deliveries are remembered). Reviews are
+  latest-wins per PR: a new push cancels an in-flight or queued review of the older head, and the replacement
+  keeps the cancelled review's incremental base (or stays a full review) so no commits go unreviewed. A review
+  already posting finishes its post first. `/healthz` now reports `queue_depth` (reviews queued or running).
 
 ## [0.1.0] — 2026-10-31
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Awaitable
 from pathlib import Path
 
 from reviewer.agents.cache import CachingLLM
@@ -14,7 +16,12 @@ from reviewer.feedback import FeedbackReport, fetch_feedback
 from reviewer.ingest.diff import parse_unified_diff, restrict_to_changes
 from reviewer.ingest.github import GitHubClient
 from reviewer.ingest.noise import split_noise
-from reviewer.ingest.sources import FilesystemSource, GitHubSource, LocalGitSource, StagedGitSource
+from reviewer.ingest.sources import (
+    FilesystemSource,
+    GitHubSource,
+    LocalGitSource,
+    StagedGitSource,
+)
 from reviewer.models import FileContext, PRContext, ReviewResult
 from reviewer.output.github_review import bot_commented_lines, post_review
 from reviewer.pipeline import review
@@ -160,8 +167,20 @@ async def review_github_pr(
         result = await review(pr, make_llm(settings), settings, already_commented=seen)
         # An incremental pass with nothing new to say stays silent instead of re-posting "no issues".
         if post and not (pr.since_sha and not (result.inline or result.summary_only)):
-            await post_review(gh, pr, result)
+            await _post_uncancellable(post_review(gh, pr, result))
     return result
+
+
+async def _post_uncancellable(posting: Awaitable[object]) -> None:
+    """A review superseded by a newer push mid-post finishes posting (inside the open client) rather than
+    leaving inline comments without their summary; the cancellation is re-raised afterwards. Cancellation
+    still lands normally anywhere before posting starts."""
+    task = asyncio.ensure_future(posting)
+    try:
+        await asyncio.shield(task)
+    except asyncio.CancelledError:
+        await task
+        raise
 
 
 async def review_local(repo: str | Path, base: str, head: str, settings: Settings) -> ReviewResult:

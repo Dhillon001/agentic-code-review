@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import httpx
+import pytest
 from conftest import FakeLLM
 
 import reviewer.service as service
@@ -209,3 +211,28 @@ async def test_incremental_with_nothing_new_stays_silent(settings, monkeypatch):
     result = await service.review_github_pr("o/r", 7, settings, post=True, since_sha="old")
     assert result.stats["files"] == 1
     assert gh.posted == []
+
+
+async def test_review_cancelled_mid_post_finishes_posting(settings, monkeypatch):
+    """A newer push cancels the webhook review task; one already posting completes its post first."""
+    gh = FakeGitHub()
+    _patch_service(monkeypatch, gh, FakeLLM({"correctness": [_finding("app/b.py", 1)]}))
+    started, release = asyncio.Event(), asyncio.Event()
+    real_post = service.post_review
+
+    async def slow_post(client, pr, result):
+        started.set()
+        await release.wait()
+        return await real_post(client, pr, result)
+
+    monkeypatch.setattr(service, "post_review", slow_post)
+    task = asyncio.create_task(service.review_github_pr("o/r", 7, settings, post=True))
+    await started.wait()
+    task.cancel()
+    await asyncio.sleep(0)
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    posted, summary = gh.posted  # the review and its summary both went out on the still-open client
+    assert [(c["path"], c["line"]) for c in posted["comments"]] == [("app/b.py", 1)]
+    assert "<!-- acr:summary -->" in summary["body"]
